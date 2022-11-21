@@ -4,6 +4,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.3.32901.215
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xll_sqlite", "xll_sqlite.vcxproj", "{18630BDF-5083-495F-9D53-0723239E75FB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D} = {367249BB-B8A3-4671-B095-A5DB904DBD6D}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xll", "xll\xll.vcxproj", "{367249BB-B8A3-4671-B095-A5DB904DBD6D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +26,14 @@ Global
 		{18630BDF-5083-495F-9D53-0723239E75FB}.Release|x64.Build.0 = Release|x64
 		{18630BDF-5083-495F-9D53-0723239E75FB}.Release|x86.ActiveCfg = Release|Win32
 		{18630BDF-5083-495F-9D53-0723239E75FB}.Release|x86.Build.0 = Release|Win32
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Debug|x64.ActiveCfg = Debug|x64
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Debug|x64.Build.0 = Debug|x64
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Debug|x86.ActiveCfg = Debug|Win32
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Debug|x86.Build.0 = Debug|Win32
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Release|x64.ActiveCfg = Release|x64
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Release|x64.Build.0 = Release|x64
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Release|x86.ActiveCfg = Release|Win32
+		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
