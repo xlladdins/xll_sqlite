@@ -9,8 +9,8 @@ AddIn xai_sqlite_create_table(
 		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
 		Arg(XLL_CSTRING4, "table", "is the name of the table."),
 		Arg(XLL_LPOPER, "data", "is a range of data."),
-		Arg(XLL_LPOPER, "columns", "is a range of column names."),
-		Arg(XLL_LPOPER, "types", "is a range of column types."),
+		Arg(XLL_LPOPER, "_columns", "is an optional range of column names."),
+		Arg(XLL_LPOPER, "_types", "is an optional range of column types."),
 		})
 		.Category(CATEGORY)
 	.FunctionHelp("Create a sqlite table in a database.")
@@ -20,8 +20,9 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 {
 #pragma XLLEXPORT
 	try {
-		ensure(pcolumns->is_missing() || columns(*pdata) == size(*pcolumns));
-		ensure(ptypes->is_missing() 
+		ensure(pdata && *pdata);
+		ensure(!pcolumns || pcolumns->is_missing() || columns(*pdata) == size(*pcolumns));
+		ensure(!ptypes || ptypes->is_missing() 
 			|| (columns(*pdata) == size(*ptypes) && rows(*pdata) > 1));
 
 		handle<sqlite::db> db_(db);
