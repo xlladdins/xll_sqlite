@@ -25,7 +25,7 @@ namespace xll {
 	// common arguments
 	static const auto Arg_db   = Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database.");
 	static const auto Arg_stmt = Arg(XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
-	static const auto Arg_sql  = Arg(XLL_LPOPER, "sql", "is a SQL query to execute.");
+	static const auto Arg_sql  = Arg(XLL_LPOPER12, "sql", "is a SQL query to execute.");
 	static const auto Arg_bind = Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
 	static const auto Arg_nh   = Arg(XLL_BOOL, "no_headers", "is a optional boolean value indicating not to return headers. Default is FALSE.");
 
