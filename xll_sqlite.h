@@ -2,6 +2,7 @@
 #pragma once
 #include <numeric>
 #include "fms_sqlite.h"
+#include "fms_parse.h"
 #include "xll_mem_oper.h"
 #include "xll/xll/splitpath.h"
 #include "xll/xll/xll.h"
@@ -14,7 +15,7 @@
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
 X(xltypeInt,     SQLITE_INTEGER, "INTEGER") \
-X(xltypeBool,    SQLITE_BOOLEAN, "INTEGER") \
+X(xltypeBool,    SQLITE_BOOLEAN, "BOOLEAN") \
 X(xltypeNum,     SQLITE_FLOAT,   "FLOAT")   \
 X(xltypeStr,     SQLITE_TEXT,    "TEXT")    \
 X(xltypeBigData, SQLITE_BLOB,    "BLOB")    \
@@ -91,22 +92,23 @@ namespace xll {
 		return sqlite_name[o.xltype];
 	}
 
-	// convert column i to OPER based on native type and column
-	inline OPER column(sqlite3_stmt* stmt, int i, int type, int ctype)
+	// convert column i to OPER
+	inline OPER column(sqlite3_stmt* stmt, int i)
 	{
-		if (type == SQLITE_NULL) {
-			return OPER(""); // "empty" cell
-		}
-
-		switch (type) {
+		switch (stmt.type(i)) {
+		case SQLITE_NULL:
+			return OPER("");
 		case SQLITE_INTEGER:
-			return OPER(sqlite3_column_int(stmt, i));
+			return OPER(stmt.column_int(i));
 		case SQLITE_FLOAT:
-			return OPER(sqlite3_column_double(stmt, i));
+		case SQLITE_NUMERIC:
+			return OPER(stmt.column_double(i));
 		case SQLITE_TEXT:
-			return OPER((const char*)sqlite3_column_text(stmt, i), sqlite3_column_bytes(stmt, i));
+			return OPER((const char*)stmt.column_text(i), stmt.column_bytes(i));
+		case SQLITE_BOOLEAN:
+			return OPER(stmt.columns_boolean(i));
 		case SQLITE_DATETIME:
-			if (SQLITE_TEXT == type) {
+			if (SQLITE_TEXT == ctype) {
 				fms::view v(sqlite3_column_text(stmt, i), sqlite3_column_bytes(stmt, i));
 				if (v.len == 0)
 					return OPER("");
@@ -118,24 +120,24 @@ namespace xll {
 					return ErrValue;
 				}
 			}
-			else if (SQLITE_INTEGER == type) {
+			else if (SQLITE_INTEGER == ctype) {
 				time_t t = sqlite3_column_int64(stmt, i);
 				if (t) {
 					return OPER(to_julian(t));
 				}
 			}
-			else if (SQLITE_FLOAT == ctype) {
-				double d = sqlite3_column_double(stmt, i);
+			else if (SQLITE_FLOAT == dt.type) {
+				double d = dt.value.f;
 				return OPER(d - 2440587.5); // Julian
 			}
 			else {
-				return ErrNA; // can't happen
+				return ErrValue; // can't happen
 			}
 		//case SQLITE_NUMERIC: 
 		// case SQLITE_BLOB:
 		}
 
-		return ErrNA;
+		return ErrValue;
 	}
 
 	inline void sqlite_bind(sqlite3_stmt* stmt, const OPER4& val, sqlite3_destructor_type del = SQLITE_TRANSIENT)

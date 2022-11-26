@@ -4,7 +4,6 @@
 #include <string>
 #include <stdexcept>
 #include "sqlite-amalgamation-3390400/sqlite3.h"
-#include "fms_parse.h"
 
 #define FMS_SQLITE_OK(DB, OP) { int status = OP; if (SQLITE_OK != status) \
 	throw std::runtime_error(sqlite3_errmsg(DB)); }
@@ -18,10 +17,10 @@ X(SQLITE_BLOB,    "BLOB")    \
 X(SQLITE_NULL,    "NULL")    \
 
 // phony types
+#define SQLITE_UNKNOWN 0
 #define SQLITE_NUMERIC -1
 #define SQLITE_DATETIME -2
 #define SQLITE_BOOLEAN -3
-#define SQLITE_UNKNOWN -4
 
 // type, affinity, enum, category
 #define SQLITE_DECLTYPE(X) \
@@ -67,6 +66,7 @@ namespace sqlite {
 	};
 #undef SQLITE_TYPE
 
+	// declared type in CREATE TABLE
 	inline int type(const char* str)
 	{
 		if (!str || !*str) {
@@ -91,6 +91,26 @@ namespace sqlite {
 
 		return SQLITE_UNKNOWN;
 	}
+
+#ifdef _DEBUG
+	inline int test_type()
+	{
+#define TYPE_TEST(a,b,c,d) if (c != sqlite::type(a)) return -1 - __COUNTER__;
+		SQLITE_DECLTYPE(TYPE_TEST)
+#undef TYPE_TEST
+		return 0;
+	}
+#endif // _DEBUG
+
+	// sqlite datetime
+	struct datetime {
+		union {
+			double f;
+			sqlite3_int64 i;
+			const unsigned char* t;
+		} value; // SQLITE_FLOAT/INTEGER/TEXT
+		int type;
+	};
 
 	// open/close a sqlite3 database
 	class db {
@@ -120,6 +140,7 @@ namespace sqlite {
 		}
 	};
 
+	// https://www.sqlite.org/lang.html
 	class stmt {
 		sqlite3* pdb;
 		sqlite3_stmt* pstmt;
@@ -158,7 +179,7 @@ namespace sqlite {
 			return ptail;
 		}
 
-		const char* sql(bool expanded = true) const
+		const char* sql(bool expanded = false) const
 		{
 			return expanded ? sqlite3_expanded_sql(pstmt) : sqlite3_sql(pstmt);
 		}
@@ -240,17 +261,21 @@ namespace sqlite {
 		{
 			return sqlite3_column_count(pstmt);
 		}
-
+		// fundamental sqlite type
 		int column_type(int i) const
 		{
 			return sqlite3_column_type(pstmt, i);
 		}
-
+		// bytes, not chars
 		int column_bytes(int i) const
 		{
 			return sqlite3_column_bytes(pstmt, i);
 		}
-
+		int column_bytes16(int i) const
+		{
+			return sqlite3_column_bytes16(pstmt, i);
+		}
+		// internal representation
 		sqlite3_value* column_value(int i)
 		{
 			return sqlite3_column_value(pstmt, i);
@@ -265,9 +290,95 @@ namespace sqlite {
 		{
 			return (const wchar_t*)sqlite3_column_name16(pstmt, i);
 		}
+		// type specified in CREATE TABLE
 		const char* column_decltype(int i) const
 		{
 			return sqlite3_column_decltype(pstmt, i);
+		}
+		int type(int i) const
+		{
+			int t = sqlite::type(column_decltype(i));
+			
+			return SQLITE_UNKNOWN ? column_type(i) : t;
+		}
+
+		// 
+		// Get column types and values.
+		//
+		bool is_null(int i) const
+		{
+			return SQLITE_NULL == column_type(i);
+		}
+
+		bool is_boolean(int i) const
+		{
+			return SQLITE_BOOLEAN == type(i);
+		}
+		bool columns_boolean(int i) const
+		{
+			return 0 != column_int(i);
+		}
+
+		bool is_int(int i) const
+		{
+			return SQLITE_INTEGER == type(i);
+		}
+		int column_int(int i) const
+		{
+			return sqlite3_column_int(pstmt, i);
+		}
+		sqlite3_int64 column_int64(int i) const
+		{
+			return sqlite3_column_int64(pstmt, i);
+		}
+
+		bool is_double(int i) const
+		{
+			return SQLITE_FLOAT == type(i);
+		}
+		double column_double(int i) const
+		{
+			return sqlite3_column_double(pstmt, i);
+		}
+
+		bool is_text(int i) const
+		{
+			return SQLITE_TEXT == type(i);
+		}
+		const unsigned char* column_text(int i) const
+		{
+			return sqlite3_column_text(pstmt, i);
+		}
+		const void* column_text16(int i) const
+		{
+			return sqlite3_column_text(pstmt, i);
+		}
+
+		bool is_blob(int i) const
+		{
+			return SQLITE_BLOB == type(i);
+		}
+		const void* column_blob(int i) const
+		{
+			return sqlite3_column_blob(pstmt, i);
+		}
+
+		bool is_datetime(int i) const
+		{
+			return SQLITE_DATETIME == type(i);
+		}
+		datetime column_datetime(int i) const
+		{
+			switch (column_type(i)) {
+			case SQLITE_FLOAT:
+				return datetime{ .value = {.f = column_double(i)}, .type = SQLITE_FLOAT};
+			case SQLITE_INTEGER:
+				return datetime{ .value = {.i = column_int64(i)}, .type = SQLITE_INTEGER };
+			case SQLITE_TEXT:
+				return datetime{ .value = {.t = column_text(i)}, .type = SQLITE_TEXT };
+			}
+
+			return datetime{.value = { .t = nullptr}, .type = SQLITE_UNKNOWN};
 		}
 	};
 
