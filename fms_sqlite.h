@@ -24,7 +24,7 @@ X(SQLITE_NULL,    "NULL")    \
 #define SQLITE_UNKNOWN -4
 
 // type, affinity, enum, category
-#define DECLTYPE(X) \
+#define SQLITE_DECLTYPE(X) \
 X("INT", "INTEGER", SQLITE_INTEGER, 1) \
 X("INTEGER", "INTEGER", SQLITE_INTEGER, 1) \
 X("TINYINT", "INTEGER", SQLITE_INTEGER, 1) \

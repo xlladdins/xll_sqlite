@@ -14,7 +14,7 @@
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
 X(xltypeInt,     SQLITE_INTEGER, "INTEGER") \
-X(xltypeBool,    SQLITE_INTEGER, "INTEGER") \
+X(xltypeBool,    SQLITE_BOOLEAN, "INTEGER") \
 X(xltypeNum,     SQLITE_FLOAT,   "FLOAT")   \
 X(xltypeStr,     SQLITE_TEXT,    "TEXT")    \
 X(xltypeBigData, SQLITE_BLOB,    "BLOB")    \
@@ -43,6 +43,8 @@ namespace xll {
 
 	inline auto view(const OPER& o)
 	{
+		ensure(xltypeStr == o.type());
+
 		return fms::view(o.val.str + 1, o.val.str[0]);
 	}
 
@@ -57,6 +59,7 @@ namespace xll {
 		return static_cast<time_t>((d - 25569) * 86400);
 	}
 
+	// 1-based
 	inline int bind_parameter_index(sqlite3_stmt* stmt, const OPER& o)
 	{
 		int i = 0; // not found
@@ -88,17 +91,14 @@ namespace xll {
 		return sqlite_name[o.xltype];
 	}
 
-	// convert column i to OPER
-	inline OPER column(sqlite3_stmt* stmt, int i)
+	// convert column i to OPER based on native type and column
+	inline OPER column(sqlite3_stmt* stmt, int i, int type, int ctype)
 	{
-		//int type = sqlite::type(sqlite3_column_decltype(stmt, i));
-		int ctype = sqlite3_column_type(stmt, i);
-
-		if (ctype == SQLITE_NULL) {
-			return OPER("");
+		if (type == SQLITE_NULL) {
+			return OPER(""); // "empty" cell
 		}
 
-		switch (ctype) {
+		switch (type) {
 		case SQLITE_INTEGER:
 			return OPER(sqlite3_column_int(stmt, i));
 		case SQLITE_FLOAT:
@@ -106,7 +106,7 @@ namespace xll {
 		case SQLITE_TEXT:
 			return OPER((const char*)sqlite3_column_text(stmt, i), sqlite3_column_bytes(stmt, i));
 		case SQLITE_DATETIME:
-			if (SQLITE_TEXT == ctype) {
+			if (SQLITE_TEXT == type) {
 				fms::view v(sqlite3_column_text(stmt, i), sqlite3_column_bytes(stmt, i));
 				if (v.len == 0)
 					return OPER("");
@@ -118,7 +118,7 @@ namespace xll {
 					return ErrValue;
 				}
 			}
-			else if (SQLITE_INTEGER == ctype) {
+			else if (SQLITE_INTEGER == type) {
 				time_t t = sqlite3_column_int64(stmt, i);
 				if (t) {
 					return OPER(to_julian(t));
