@@ -37,7 +37,7 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 
 		OPER schema(data.columns(), 2);
 		for (unsigned j = 0; j < schema.rows(); ++j) {
-			schema(j, 0) = column ? column[j] : data(0, j);
+			schema(j, 0) = OPER("[") & (column ? column[j] : data(0, j)) & OPER("]");
 			if (type) {
 				const OPER& typej = Excel(xlfUpper, type[j]);
 				schema(j, 1) = typej ? typej : type_name(data(1, j));

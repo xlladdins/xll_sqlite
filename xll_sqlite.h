@@ -93,7 +93,7 @@ namespace xll {
 	}
 
 	// convert column i to OPER
-	inline OPER column(sqlite3_stmt* stmt, int i)
+	inline OPER column(const sqlite::stmt& stmt, int i)
 	{
 		switch (stmt.type(i)) {
 		case SQLITE_NULL:
@@ -108,8 +108,9 @@ namespace xll {
 		case SQLITE_BOOLEAN:
 			return OPER(stmt.columns_boolean(i));
 		case SQLITE_DATETIME:
-			if (SQLITE_TEXT == ctype) {
-				fms::view v(sqlite3_column_text(stmt, i), sqlite3_column_bytes(stmt, i));
+			auto dt = stmt.column_datetime(i);
+			if (SQLITE_TEXT == dt.type) {
+				fms::view v(stmt.column_text(i), stmt.column_bytes(i));
 				if (v.len == 0)
 					return OPER("");
 				struct tm tm;
@@ -120,8 +121,8 @@ namespace xll {
 					return ErrValue;
 				}
 			}
-			else if (SQLITE_INTEGER == ctype) {
-				time_t t = sqlite3_column_int64(stmt, i);
+			else if (SQLITE_INTEGER == dt.type) {
+				time_t t = dt.value.i;
 				if (t) {
 					return OPER(to_julian(t));
 				}
