@@ -148,7 +148,11 @@ namespace sqlite {
 	public:
 		stmt(sqlite3* pdb)
 			: pdb(pdb), pstmt(nullptr), ptail(nullptr)
-		{ }
+		{
+			if (!pdb) {
+				throw std::runtime_error(__FUNCTION__ ": database handle must not be null");
+			}
+		}
 		stmt(const stmt&) = delete;
 		stmt& operator=(const stmt&) = delete;
 		~stmt()
@@ -207,44 +211,44 @@ namespace sqlite {
 			return *this;
 		}
 
-		stmt& bind(int i, double d)
+		const stmt& bind(int i, double d) const
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_double(pstmt, i, d));
 
 			return *this;
 		}
-		stmt& bind(int i, int j)
+		const stmt& bind(int i, int j) const
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_int(pstmt, i, j));
 
 			return *this;
 		}
-		stmt& bind(int i, int64_t j)
+		const stmt& bind(int i, int64_t j) const
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_int64(pstmt, i, j));
 
 			return *this;
 		}
-		stmt& bind(int i, const char* str, int len = -1, void(*cb)(void*) = SQLITE_TRANSIENT)
+		const stmt& bind(int i, const char* str, int len = -1, void(*cb)(void*) = SQLITE_TRANSIENT) const
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_text(pstmt, i, str, len, cb));
 
 			return *this;
 		}
-		stmt& bind(int i, const wchar_t* str, int len = -1, void(*cb)(void*) = SQLITE_TRANSIENT)
+		const stmt& bind(int i, const wchar_t* str, int len = -1, void(*cb)(void*) = SQLITE_TRANSIENT) const
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_text16(pstmt, i, str, len, cb));
 
 			return *this;
 		}
-		stmt& bind(int i)
+		const stmt& bind(int i) const
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_null(pstmt, i));
 
 			return *this;
 		}
 
-		int bind_parameter_index(const char* name)
+		int bind_parameter_index(const char* name) const
 		{
 			return sqlite3_bind_parameter_index(pstmt, name);
 		}

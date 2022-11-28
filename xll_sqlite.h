@@ -26,7 +26,7 @@ namespace xll {
 	// common arguments
 	static const auto Arg_db   = Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database.");
 	static const auto Arg_stmt = Arg(XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
-	static const auto Arg_sql  = Arg(XLL_LPOPER12, "sql", "is a SQL query to execute.");
+	static const auto Arg_sql  = Arg(XLL_LPOPER, "sql", "is a SQL query to execute.");
 	static const auto Arg_bind = Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
 	static const auto Arg_nh   = Arg(XLL_BOOL, "no_headers", "is a optional boolean value indicating not to return headers. Default is FALSE.");
 
@@ -141,7 +141,7 @@ namespace xll {
 		return ErrValue;
 	}
 
-	inline void sqlite_bind(sqlite3_stmt* stmt, const OPER4& val, sqlite3_destructor_type del = SQLITE_TRANSIENT)
+	inline void sqlite_bind(const sqlite::stmt& stmt, const OPER4& val, sqlite3_destructor_type del = SQLITE_TRANSIENT)
 	{
 		size_t n = val.columns() == 2 ? val.rows() : val.size();
 
@@ -156,7 +156,10 @@ namespace xll {
 				if (name[0] != ':') {
 					name.insert(0, 1, ':');
 				}
-				pi = sqlite3_bind_parameter_index(stmt, name.c_str());
+				pi = stmt.bind_parameter_index(name.c_str());
+				if (!pi) {
+					XLL_WARNING((name + ": not found").c_str());
+				}
 			}
 			else if (!val[i]) {
 				continue;
@@ -164,13 +167,19 @@ namespace xll {
 
 			const OPER4& vali = pi ? val(i, 1) : val[i];
 			if (vali.is_num()) {
-				sqlite3_bind_double(stmt, pi, vali.val.num);
+				stmt.bind(pi, vali.val.num);
 			}
 			else if (vali.is_str()) {
-				sqlite3_bind_text(stmt, pi, vali.val.str + 1, vali.val.str[0], del);
+				stmt.bind(pi, vali.val.str + 1, vali.val.str[0], del);
+			}
+			else if (vali.is_nil()) {
+				stmt.bind(pi);
+			}
+			else if (vali.is_bool()) {
+				stmt.bind(pi, vali.val.xbool);
 			}
 			else {
-				ensure(!__FUNCTION__ ": value to bind must be number or string");
+				ensure(!__FUNCTION__ ": value to bind must be number, string, or null");
 			}
 		}
 	}
