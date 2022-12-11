@@ -1,7 +1,132 @@
-// xll_sqlite_create_table.cpp
+// xll_sqlite_table.cpp
 #include "xll_sqlite.h"
 
 using namespace xll;
+
+const char* common_type(const char* a, const char* b)
+{
+	int ta = sqlite::type(a);
+	int tb = sqlite::type(b);
+
+	if (ta == tb) {
+		return a;
+	}
+
+	switch (ta) {
+	case SQLITE_INTEGER:
+		switch (tb) {
+		case SQLITE_FLOAT:
+			return b;
+		case SQLITE_TEXT:
+			return b;
+		case SQLITE_DATETIME:
+			return b;
+		default:
+			return a;
+		}
+	case SQLITE_FLOAT:
+		switch (tb) {
+		case SQLITE_TEXT:
+			return b;
+		case SQLITE_DATETIME:
+			return b;
+		default:
+			return a;
+		}
+	case SQLITE_TEXT:
+		switch (tb) {
+		case SQLITE_DATETIME:
+			return b;
+		default:
+			return a;
+		}
+	}
+
+	return a;
+}
+
+const char* guess_type(const OPER& o)
+{
+	const char* type = sqlite_name[o.type()];
+	if (xltypeStr == o.type()) {
+		tm tm;
+		fms::view<wchar_t> v(o.val.str + 1, o.val.str[0]);
+		if (fms::parse_tm(v, &tm)) {
+			return "DATETIME";
+		}
+	}
+
+	return type;
+}
+
+const char* guess_type(const OPER& o, int col, int rows)
+{
+	const char* type = guess_type(o(0, col));
+
+	for (int i = 1; i < rows; ++i) {
+		const char* typei = sqlite_name[o(i, col).type()];
+		if (0 != strcmp(type, typei)) {
+			type = common_type(type, typei);
+		}
+	}
+
+	return type;
+}
+
+AddIn xai_sqlite_types(
+	Function(XLL_LPOPER, "xll_sqlite_types", CATEGORY ".TYPES")
+	.Arguments({
+		Arg(XLL_LPOPER, "range", "is a range."),
+		Arg(XLL_USHORT, "_rows", "is an optional number of rows to scan. Default is all.")
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Guess sqlite types of columns.")
+);
+LPOPER WINAPI xll_sqlite_types(const LPOPER po, unsigned short rows)
+{
+#pragma XLLEXPORT
+	static OPER o;
+
+	if (rows == 0) {
+		rows = (unsigned short)po->rows();
+	}
+
+	o.resize(1, po->size());
+	for (unsigned j = 0; j < o.columns(); ++j) {
+		o[j] = guess_type(o, j, rows);
+	}
+
+	return &o;
+}
+
+AddIn xai_sqlite_insert_table(
+	Function(XLL_HANDLEX, "xll_sqlite_insert_table", CATEGORY ".INSERT_TABLE")
+	.Arguments({
+		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
+		Arg(XLL_PSTRING4, "table", "is the name of the table."),
+		Arg(XLL_LPOPER, "data", "is a range of data."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Create a sqlite table in a database.")
+	.HelpTopic("https://www.sqlite.org/lang_insert.html")
+);
+HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const OPER& o)
+{
+#pragma XLLEXPORT
+	try {
+		handle<sqlite::db> db_(db);
+		ensure(db_);
+		cursor cur(o);
+		sqlite::insert(*db_, table + 1, table[0], cur);
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+
+		return INVALID_HANDLEX;
+	}
+
+	return db;
+}
 
 AddIn xai_sqlite_create_table(
 	Function(XLL_HANDLEX, "xll_sqlite_create_table", CATEGORY ".CREATE_TABLE")
@@ -77,7 +202,7 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 						time_t t = _mkgmtime(&tm);
 						stmt.bind(j + 1, t);
 					}
-					stmt.bind(j + 1, oij.val.str + 1, 2 * oij.val.str[0], SQLITE_STATIC);
+					stmt.bind(j + 1, oij.val.str + 1, oij.val.str[0], SQLITE_STATIC);
 				}
 				else {
 					if (Excel(xlfLeft, schema(j, 1), OPER(4)) == "DATE") {

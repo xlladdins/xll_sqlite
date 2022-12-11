@@ -49,6 +49,91 @@ namespace xll {
 		return fms::view(o.val.str + 1, o.val.str[0]);
 	}
 
+	template<class X>
+	class cursor : public sqlite::cursor {
+		unsigned row;
+		const XOPER<X>& o;
+	public:
+		cursor(const XOPER<X>& o)
+			: row{ 0 }, o(o)
+		{ }
+		int _column_count() const override
+		{
+			return o.columns();
+		}
+		sqlite::cursor::type _column_type(int i) const override
+		{
+			using type = sqlite::cursor::type;
+
+			switch (o(row, i).type()) {
+			case xltypeNum:
+				return type::_double;
+			case xltypeStr:
+				return std::is_same_v<traits<X>::xchar, char> ? type::_text : type::_text16;
+			case xltypeInt:
+				return type::_int;
+				/*
+			case xltypeBigData:
+				return type::_blob;
+				*/
+			case xltypeNil:
+				return type::_null;
+			default:
+				ensure(!__FUNCTION__ ": unknown type");
+			}
+
+			return type::_null;
+		}
+		bool _done() const override
+		{
+			return row >= o.rows();
+		}
+		void _step() override
+		{
+			++row;
+		}
+
+		/*
+		std::span<void*> _as_blob(int i) const override
+		{
+			auto blob = o(row, i).val.bigdata;
+			void* p = blob.h.lpData;
+
+			return std::span<void*>(p, p + blob.cbData);
+		}
+		*/
+		double _as_double(int i) const override
+		{
+			return o(row, i).as_num();
+		}
+		int _as_int(int i) const override
+		{
+			return o(row, i).as_int();
+		}
+		std::string_view _as_text(int i) const override
+		{
+			const auto& str = o(row, i).val.str;
+
+			if constexpr (std::is_same_v<traits<X>::xchar, char>) {
+				return std::string_view(str + 1, str[0]);
+			}
+			else {
+				return std::string_view{};
+			}
+		}
+		std::wstring_view _as_text16(int i) const override
+		{
+			const auto& str = o(row, i).val.str;
+
+			if constexpr (std::is_same_v<traits<X>::xchar, wchar_t>) {
+				return std::wstring_view(str + 1, str[0]);
+			}
+			else {
+				return std::wstring_view{};
+			}
+		}
+	};
+
 	// time_t to Excel Julian date
 	inline double to_julian(time_t t)
 	{

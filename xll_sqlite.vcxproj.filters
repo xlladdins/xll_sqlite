@@ -38,7 +38,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="xll_sqlite_create_table.cpp">
+    <ClCompile Include="xll_sqlite_table.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="xll_sqlite_db.cpp">

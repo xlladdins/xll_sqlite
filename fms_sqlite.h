@@ -1,6 +1,7 @@
 // fms_sqlite.h
 #pragma once
 #include <map>
+#include <span>
 #include <string>
 #include <stdexcept>
 #include "sqlite-amalgamation-3390400/sqlite3.h"
@@ -207,41 +208,73 @@ namespace sqlite {
 			return *this;
 		}
 
+		// blob
+		stmt& bind(int i, const void* blob, int n, void(*dispose)(void*) = SQLITE_STATIC)
+		{
+			FMS_SQLITE_OK(pdb, sqlite3_bind_blob(pstmt, i, blob, n, dispose));
+
+			return *this;
+		}
+		stmt& bind(int i, const std::span<void*>& blob, void(*dispose)(void*) = SQLITE_STATIC)
+		{
+			FMS_SQLITE_OK(pdb, sqlite3_bind_blob(pstmt, i, blob.data(),
+				static_cast<int>(blob.size()), dispose));
+
+			return *this;
+		}
+
+		// double
 		stmt& bind(int i, double d)
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_double(pstmt, i, d));
 
 			return *this;
 		}
+
+		// int
 		stmt& bind(int i, int j)
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_int(pstmt, i, j));
 
 			return *this;
 		}
+		// int64
 		stmt& bind(int i, int64_t j)
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_int64(pstmt, i, j));
 
 			return *this;
 		}
+
+		// null
+		stmt& bind(int i)
+		{
+			FMS_SQLITE_OK(pdb, sqlite3_bind_null(pstmt, i));
+
+			return *this;
+		}
+
+		// text
 		stmt& bind(int i, const char* str, int len = -1, void(*cb)(void*) = SQLITE_TRANSIENT)
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_text(pstmt, i, str, len, cb));
 
 			return *this;
 		}
+		stmt& bind(int i, const std::string_view& str, void(*cb)(void*) = SQLITE_TRANSIENT)
+		{
+			return bind(i, str.data(), static_cast<int>(str.length()), cb);
+		}
+		// text16 with length in characters
 		stmt& bind(int i, const wchar_t* str, int len = -1, void(*cb)(void*) = SQLITE_TRANSIENT)
 		{
-			FMS_SQLITE_OK(pdb, sqlite3_bind_text16(pstmt, i, str, len, cb));
+			FMS_SQLITE_OK(pdb, sqlite3_bind_text16(pstmt, i, str, 2*len, cb));
 
 			return *this;
 		}
-		stmt& bind(int i)
+		stmt& bind(int i, const std::wstring_view& str, void(*cb)(void*) = SQLITE_TRANSIENT)
 		{
-			FMS_SQLITE_OK(pdb, sqlite3_bind_null(pstmt, i));
-
-			return *this;
+			return bind(i, str.data(), static_cast<int>(str.length()), cb);
 		}
 
 		int bind_parameter_index(const char* name)
@@ -381,5 +414,120 @@ namespace sqlite {
 			return datetime{.value = { .t = nullptr}, .type = SQLITE_UNKNOWN};
 		}
 	};
+
+	struct cursor {
+		enum class type {
+			//_blob,
+			_double,
+			_int,
+			//_int64,
+			_null,
+			_text,
+			_text16
+		};
+		int column_count() const
+		{
+			return _column_count();
+		}
+		type column_type(int i) const
+		{
+			return _column_type(i);
+		}
+		bool done() const
+		{
+			return _done();
+		}
+		void step() 
+		{
+			return _step();
+		}
+		/*
+		std::span<void*> as_blob(int i) const
+		{
+			return _as_blob(i);
+		}
+		*/
+		double as_double(int i) const
+		{
+			return _as_double(i);
+		}
+		int as_int(int i) const
+		{
+			return _as_int(i);
+		}
+		std::string_view as_text(int i) const
+		{
+			return _as_text(i);
+		}
+		std::wstring_view as_text16(int i) const
+		{
+			return _as_text16(i);
+		}
+	private:
+		virtual int _column_count() const = 0;
+		virtual type _column_type(int i) const = 0;
+		virtual bool _done() const = 0;
+		virtual void _step() = 0;
+		//virtual std::span<void*> _as_blob(int i) const = 0;
+		virtual double _as_double(int i) const = 0;
+		virtual int _as_int(int i) const = 0;
+		virtual std::string_view _as_text(int i) const = 0;
+		virtual std::wstring_view _as_text16(int i) const = 0;
+	};
+
+	inline void insert(sqlite3* db, const char* table, size_t len, cursor& cur)
+	{
+		sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
+		
+		std::string ii("INSERT INTO [");
+		if (len <= 0) {
+			len = strlen(table);
+		}
+		ii.append(table, len);
+		ii.append("] VALUES (?1");
+		char buf[8];
+		for (int i = 2; i <= cur.column_count(); ++i) {
+			ii.append(", ?");
+			sprintf_s(buf, "%d", i);
+			ii.append(buf);
+		}
+		ii.append(");");
+		
+		sqlite::stmt stmt(db);
+		stmt.prepare(ii.c_str(), static_cast<int>(ii.length()));
+
+		while (!cur.done()) {
+			for (int i = 0; i < cur.column_count(); ++i) {
+				switch (cur.column_type(i)) {
+					/*
+				case cursor::type::_blob:
+					stmt.bind(i + 1, cur.as_blob(i));
+					break;
+					*/
+				case cursor::type::_double:
+					stmt.bind(i + 1, cur.as_double(i));
+					break;
+				case cursor::type::_int:
+					stmt.bind(i + 1, cur.as_int(i));
+					break;
+				case cursor::type::_null:
+					stmt.bind(i + 1);
+					break;
+				case cursor::type::_text:
+					stmt.bind(i + 1, cur.as_text(i));
+					break;
+				case cursor::type::_text16:
+					stmt.bind(i + 1, cur.as_text16(i));
+					break;
+				}
+			}
+			stmt.step();
+			stmt.reset();
+			cur.step();
+		}
+
+		sqlite3_exec(db, "COMMIT TRANSACTION", NULL, NULL, NULL);
+
+	}
 
 } // sqlite
