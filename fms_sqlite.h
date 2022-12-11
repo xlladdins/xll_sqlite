@@ -149,7 +149,11 @@ namespace sqlite {
 	public:
 		stmt(sqlite3* pdb)
 			: pdb(pdb), pstmt(nullptr), ptail(nullptr)
-		{ }
+		{
+			if (!pdb) {
+				throw std::runtime_error(__FUNCTION__ ": database handle must not be null");
+			}
+		}
 		stmt(const stmt&) = delete;
 		stmt& operator=(const stmt&) = delete;
 		~stmt()
@@ -208,22 +212,6 @@ namespace sqlite {
 			return *this;
 		}
 
-		// blob
-		stmt& bind(int i, const void* blob, int n, void(*dispose)(void*) = SQLITE_STATIC)
-		{
-			FMS_SQLITE_OK(pdb, sqlite3_bind_blob(pstmt, i, blob, n, dispose));
-
-			return *this;
-		}
-		stmt& bind(int i, const std::span<void*>& blob, void(*dispose)(void*) = SQLITE_STATIC)
-		{
-			FMS_SQLITE_OK(pdb, sqlite3_bind_blob(pstmt, i, blob.data(),
-				static_cast<int>(blob.size()), dispose));
-
-			return *this;
-		}
-
-		// double
 		stmt& bind(int i, double d)
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_double(pstmt, i, d));
@@ -277,7 +265,7 @@ namespace sqlite {
 			return bind(i, str.data(), static_cast<int>(str.length()), cb);
 		}
 
-		int bind_parameter_index(const char* name)
+		int bind_parameter_index(const char* name) const
 		{
 			return sqlite3_bind_parameter_index(pstmt, name);
 		}
