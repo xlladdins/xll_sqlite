@@ -57,6 +57,11 @@ namespace xll {
 		cursor(const XOPER<X>& o)
 			: row{ 0 }, o(o)
 		{ }
+		cursor(const cursor&) = delete;
+		cursor& operator=(const cursor&) = delete;
+		~cursor()
+		{ }
+
 		int _column_count() const override
 		{
 			return o.columns();
@@ -226,7 +231,7 @@ namespace xll {
 		return ErrValue;
 	}
 
-	inline void sqlite_bind(const sqlite::stmt& stmt, const OPER4& val, sqlite3_destructor_type del = SQLITE_TRANSIENT)
+	inline void sqlite_bind(sqlite::stmt& stmt, const OPER4& val, sqlite3_destructor_type del = SQLITE_TRANSIENT)
 	{
 		size_t n = val.columns() == 2 ? val.rows() : val.size();
 

@@ -104,7 +104,7 @@ AddIn xai_sqlite_insert_table(
 	.Arguments({
 		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
 		Arg(XLL_PSTRING4, "table", "is the name of the table."),
-		Arg(XLL_LPOPER, "data", "is a range of data."),
+		Arg(XLL_LPOPER, "data", "is a range of data or a handle to a sqlite cursor."),
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Create a sqlite table in a database.")
@@ -116,8 +116,15 @@ HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const OPER
 	try {
 		handle<sqlite::db> db_(db);
 		ensure(db_);
-		cursor cur(o);
-		sqlite::insert(*db_, table + 1, table[0], cur);
+		if (o.size() == 1 && o.is_num()) {
+			handle<sqlite::cursor> cur_(o.as_num());
+			ensure(cur_);
+			sqlite::insert(*db_, table + 1, table[0], *cur_);
+		}
+		else {
+			cursor cur(o);
+			sqlite::insert(*db_, table + 1, table[0], cur);
+		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

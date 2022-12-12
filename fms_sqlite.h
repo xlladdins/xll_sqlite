@@ -413,6 +413,8 @@ namespace sqlite {
 			_text,
 			_text16
 		};
+		virtual ~cursor()
+		{ }
 		int column_count() const
 		{
 			return _column_count();
