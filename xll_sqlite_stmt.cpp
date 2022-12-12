@@ -81,7 +81,7 @@ HANDLEX WINAPI xll_sqlite_stmt_prepare(HANDLEX stmt, const LPOPER psql)
 		ensure(stmt_);
 
 		std::string sql = to_string(*psql, " ", " ");
-		stmt_->prepare(sql.c_str(), (int)sql.length());
+		stmt_->prepare(sql);
 
 		result = stmt;
 	}
@@ -181,7 +181,7 @@ LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, BOOL no_head
 
 		sqlite::stmt stmt(*db_);
 		std::string sql = to_string(*psql, " ", " ");
-		stmt.prepare(sql.c_str(), (int)sql.length());
+		stmt.prepare(sql);
 		sqlite_bind(stmt, *pval);
 		
 		result = sqlite_exec_mem<XLOPER12>(stmt, no_headers);
@@ -215,7 +215,7 @@ LPOPER WINAPI xll_sqlite_stmt_explain(HANDLEX stmt, BOOL no_headers)
 
 		auto sql = std::string("EXPLAIN QUERY PLAN ") + stmt_->sql();
 		sqlite::stmt eqp(stmt_->db_handle());
-		eqp.prepare(sql.c_str(), (int)sql.length());
+		eqp.prepare(sql);
 		result = sqlite_exec(eqp, no_headers);
 	}
 	catch (const std::exception& ex) {

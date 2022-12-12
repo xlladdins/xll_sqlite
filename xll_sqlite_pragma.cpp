@@ -60,7 +60,7 @@ LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma, BOOL no_headers)
 			+ (*pragma ? pragma : "pragma_list");
 
 		sqlite::stmt stmt(*db_);
-		stmt.prepare(sql.c_str(), (int)sql.length());
+		stmt.prepare(sql);
 
 		result = sqlite_exec(stmt, no_headers);
 	}
@@ -102,6 +102,9 @@ AddIn xai_sqlite_table_info(
 LPOPER WINAPI xll_sqlite_table_info(HANDLEX db, const char* table, bool no_headers)
 {
 #pragma XLLEXPORT
+	handle<sqlite::db> db_(db);
+	sqlite::table_info ti(*db_, table);
+
 
 	return xll_sqlite_pragma(db, (std::string("table_info(") + table + ")").c_str(), no_headers);
 }

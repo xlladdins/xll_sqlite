@@ -2,7 +2,7 @@
 #include "xll_sqlite.h"
 
 using namespace xll;
-
+#if 0
 const char* common_type(const char* a, const char* b)
 {
 	int ta = sqlite::type(a);
@@ -122,19 +122,19 @@ HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const OPER
 			sqlite::insert(*db_, table + 1, table[0], *cur_);
 		}
 		else {
-			cursor cur(o);
+			xll::cursor<XLOPER12> cur(o);
 			sqlite::insert(*db_, table + 1, table[0], cur);
 		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
 
-		return INVALID_HANDLEX;
+		db = INVALID_HANDLEX;
 	}
 
 	return db;
 }
-
+#endif // 0
 AddIn xai_sqlite_create_table(
 	Function(XLL_HANDLEX, "xll_sqlite_create_table", CATEGORY ".CREATE_TABLE")
 	.Arguments({
@@ -193,7 +193,7 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 		}
 		ii += ")";
 		sqlite::stmt stmt(*db_);
-		stmt.prepare(ii.c_str(), (int)ii.length());
+		stmt.prepare(ii);
 
 		for (unsigned i = column.is_missing(); i < data.rows(); ++i) {			
 			for (unsigned j = 0; j < data.columns(); ++j) {
@@ -209,7 +209,7 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 						time_t t = _mkgmtime(&tm);
 						stmt.bind(j + 1, t);
 					}
-					stmt.bind(j + 1, oij.val.str + 1, oij.val.str[0], SQLITE_STATIC);
+					stmt.bind(j + 1, std::wstring_view(oij.val.str + 1, oij.val.str[0]), SQLITE_STATIC);
 				}
 				else {
 					if (Excel(xlfLeft, schema(j, 1), OPER(4)) == "DATE") {

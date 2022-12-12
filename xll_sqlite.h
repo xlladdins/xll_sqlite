@@ -1,5 +1,6 @@
 // xll_sqlite.h
 #pragma once
+#include <charconv>
 #include <numeric>
 #include "fms_sqlite.h"
 #include "fms_parse.h"
@@ -15,7 +16,7 @@
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
 X(xltypeInt,     SQLITE_INTEGER, "INTEGER") \
-X(xltypeBool,    SQLITE_BOOLEAN, "BOOLEAN") \
+X(xltypeBool,    SQLITE_INTEGER, "BOOLEAN") \
 X(xltypeNum,     SQLITE_FLOAT,   "FLOAT")   \
 X(xltypeStr,     SQLITE_TEXT,    "TEXT")    \
 X(xltypeBigData, SQLITE_BLOB,    "BLOB")    \
@@ -30,6 +31,7 @@ namespace xll {
 	static const auto Arg_bind = Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
 	static const auto Arg_nh   = Arg(XLL_BOOL, "no_headers", "is a optional boolean value indicating not to return headers. Default is FALSE.");
 
+	// xltype to sqlite basic type
 #define XLTYPE(a, b, c) {a, b},
 	inline std::map<int, int> sqlite_type = {
 		XLL_SQLITE_TYPE(XLTYPE)
@@ -42,52 +44,95 @@ namespace xll {
 	};
 #undef XLNAME
 
-	inline auto view(const OPER& o)
+	inline auto view(const XLOPER& o)
 	{
-		ensure(xltypeStr == o.type());
+		ensure(xltypeStr == type(o));
 
-		return fms::view(o.val.str + 1, o.val.str[0]);
+		return fms::view<char>(o.val.str + 1, o.val.str[0]);
+	}
+	inline auto view(const XLOPER12& o)
+	{
+		ensure(xltypeStr == type(o));
+
+		return fms::view<XCHAR>(o.val.str + 1, o.val.str[0]);
+	}
+#if 0
+	inline std::string to_chars(int i)
+	{
+		std::string str(10, 0);
+		auto [ptr, ec] = std::to_chars(str.data(), str.data() + str.length(), i);
+		if (ec == std::errc{}) {
+			str.resize(ptr - str.data());
+		}
+		else {
+			throw std::runtime_error(std::make_error_code(ec).message());
+		}
+
+		return str;
 	}
 
 	template<class X>
 	class cursor : public sqlite::cursor {
 		unsigned row;
 		const XOPER<X>& o;
+		std::vector<sqlite::cursor::type> _type;
+		std::vector<std::string> _name;
 	public:
-		cursor(const XOPER<X>& o)
-			: row{ 0 }, o(o)
-		{ }
+		cursor(const XOPER<X>& o, unsigned row = 0)
+			: row{ row }, o{ o }, _type(o.columns()), _name(o.columns())
+		{
+			for (unsigned i = 0; i < o.columns(); ++i) {
+				if (row == 0) {
+					_type[i] = sqlite_type[o(0, i).type()];
+					_name[i] = to_chars(i);
+				}
+				else if (row == 1) {
+					_type[i] = sqlite_type[o(1, i).type()];
+					_name[i] = o(0, i).to_string();
+				}
+				else {
+					if (o(0, i) && o(0,i).is_str()) {
+						_type[i] = sqlite::type(o(0, i).val.str + 1);
+					}
+					else {
+						_type[i] = sqlite_type[o(1, i).type()];
+					}
+					_name[i] = o(1, i).to_string();
+				}
+			}
+		}
 		cursor(const cursor&) = delete;
 		cursor& operator=(const cursor&) = delete;
 		~cursor()
 		{ }
-
 		int _column_count() const override
 		{
 			return o.columns();
 		}
-		sqlite::cursor::type _column_type(int i) const override
+		int _column_type(int i) const override
 		{
-			using type = sqlite::cursor::type;
-
 			switch (o(row, i).type()) {
 			case xltypeNum:
-				return type::_double;
+				return SQLITE_FLOAT;
 			case xltypeStr:
-				return std::is_same_v<traits<X>::xchar, char> ? type::_text : type::_text16;
+				return SQLITE_TEXT;
 			case xltypeInt:
-				return type::_int;
+				return SQLITE_INTEGER;
 				/*
 			case xltypeBigData:
-				return type::_blob;
+				return SQLITE_BLOB;
 				*/
 			case xltypeNil:
-				return type::_null;
+				return SQLITE_NULL;
 			default:
 				ensure(!__FUNCTION__ ": unknown type");
 			}
 
-			return type::_null;
+			return SQLITE_UNKNOWN;
+		}
+		const char* _column_name(int /*i*/) const override
+		{
+			return nullptr;
 		}
 		bool _done() const override
 		{
@@ -138,6 +183,7 @@ namespace xll {
 			}
 		}
 	};
+#endif // 0
 
 	// time_t to Excel Julian date
 	inline double to_julian(time_t t)
@@ -193,15 +239,18 @@ namespace xll {
 		case SQLITE_FLOAT:
 		case SQLITE_NUMERIC:
 			return OPER(stmt.column_double(i));
-		case SQLITE_TEXT:
-			return OPER((const char*)stmt.column_text(i), stmt.column_bytes(i));
+		case SQLITE_TEXT: {
+			auto text = stmt.column_text(i);
+			return OPER(text.data(), static_cast<char>(text.size()));
+		}
 		case SQLITE_BOOLEAN:
 			return OPER(stmt.columns_boolean(i));
 		case SQLITE_DATETIME:
 			auto dt = stmt.column_datetime(i);
+			/*
 			if (SQLITE_TEXT == dt.type) {
-				fms::view v(stmt.column_text(i), stmt.column_bytes(i));
-				if (v.len == 0)
+				auto v = stmt.column_text(i);
+				if (v.size() == 0)
 					return OPER("");
 				struct tm tm;
 				if (fms::parse_tm(v, &tm)) {
@@ -211,7 +260,8 @@ namespace xll {
 					return ErrValue;
 				}
 			}
-			else if (SQLITE_INTEGER == dt.type) {
+			*/
+			if (SQLITE_INTEGER == dt.type) {
 				time_t t = dt.value.i;
 				if (t) {
 					return OPER(to_julian(t));
@@ -260,7 +310,7 @@ namespace xll {
 				stmt.bind(pi, vali.val.num);
 			}
 			else if (vali.is_str()) {
-				stmt.bind(pi, vali.val.str + 1, vali.val.str[0], del);
+				stmt.bind(pi, std::string_view(vali.val.str + 1, vali.val.str[0]), del);
 			}
 			else if (vali.is_nil()) {
 				stmt.bind(pi);
