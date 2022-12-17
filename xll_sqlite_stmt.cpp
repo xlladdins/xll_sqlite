@@ -225,6 +225,7 @@ LPOPER WINAPI xll_sqlite_stmt_explain(HANDLEX stmt, BOOL no_headers)
 	return &result;
 }
 
+#if 0
 void execa(std::stop_token token, OPER12 x, OPER12 h)
 {
 	//std::this_thread::sleep_for(std::chrono::seconds(px->as_int()));
@@ -251,3 +252,4 @@ void WINAPI xll_execa(LPOPER12 px, LPOPER12 ph)
 	std::jthread jt(execa, std::stop_token{}, *px, *ph);
 }
 
+#endif // 0
