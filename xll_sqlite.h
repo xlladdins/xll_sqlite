@@ -16,7 +16,7 @@
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
 X(xltypeInt,     SQLITE_INTEGER, "INTEGER") \
-X(xltypeBool,    SQLITE_INTEGER, "BOOLEAN") \
+X(xltypeBool,    SQLITE_BOOLEAN, "BOOLEAN") \
 X(xltypeNum,     SQLITE_FLOAT,   "FLOAT")   \
 X(xltypeStr,     SQLITE_TEXT,    "TEXT")    \
 X(xltypeBigData, SQLITE_BLOB,    "BLOB")    \
@@ -39,7 +39,7 @@ namespace xll {
 #undef XLTYPE
 
 #define XLNAME(a, b, c) {a, c},
-	inline std::map<int, const char*> sqlite_name = {
+	inline std::map<int, const char*> sqlite_decltype = {
 		XLL_SQLITE_TYPE(XLNAME)
 	};
 #undef XLNAME
@@ -186,18 +186,19 @@ namespace xll {
 #endif // 0
 
 	// time_t to Excel Julian date
-	inline double to_julian(time_t t)
+	inline double to_excel(time_t t)
 	{
 		return static_cast<double>(25569. + t / 86400.);
 	}
 	// Excel Julian date to time_t
-	inline time_t to_time(double d)
+	inline time_t to_time_t(double d)
 	{
 		return static_cast<time_t>((d - 25569) * 86400);
 	}
 
 	// 1-based
-	inline int bind_parameter_index(sqlite3_stmt* stmt, const OPER& o)
+	template<class X>
+	inline int bind_parameter_index(sqlite3_stmt* stmt, const XOPER<X>& o)
 	{
 		int i = 0; // not found
 
@@ -214,6 +215,46 @@ namespace xll {
 		return i;
 	}
 
+	template<class X>
+	inline void bind(sqlite3_stmt* stmt, int i, const XOPER<X>& o, int type = 0)
+	{
+		if (o.is_nil()) {
+			sqlite3_bind_null(stmt, i);
+			return;
+		}
+
+		if (!type) {
+			type = sqlite_type[o.type()];
+		}
+
+		switch (o.type()) {
+		case xltypeNum:
+			if (type == SQLITE_DATETIME) {
+				sqlite3_bind_int64(stmt, i, to_time_t(o.val.num));
+			}
+			else {
+				sqlite3_bind_double(stmt, i, o.as_num());
+			}
+			return;
+		case xltypeStr:
+			if constexpr (std::is_same_v<char, typename traits<X>::xchar>) {
+				sqlite3_bind_text(stmt, i, o.val.str + 1, o.val.str[0], SQLITE_TRANSIENT);
+			}
+			else {
+				sqlite3_bind_text16(stmt, i, o.val.str + 1, 2*o.val.str[0], SQLITE_TRANSIENT);
+			}
+			return;
+		case xltypeBool:
+			sqlite3_bind_int(stmt, i, o.val.xbool);
+			return;
+		case xltypeInt:
+			sqlite3_bind_int(stmt, i, o.val.w);
+			return;
+		}
+
+		ensure(!__FUNCTION__ ": invalid type");
+	}
+
 	// Detect sqlite type name
 	inline const char* type_name(const OPER& o)
 	{
@@ -225,7 +266,7 @@ namespace xll {
 			}
 		}
 
-		return sqlite_name[o.xltype];
+		return sqlite_decltype[o.type()];
 	}
 
 	// convert column i to OPER
@@ -247,24 +288,23 @@ namespace xll {
 			return OPER(stmt.columns_boolean(i));
 		case SQLITE_DATETIME:
 			auto dt = stmt.column_datetime(i);
-			/*
 			if (SQLITE_TEXT == dt.type) {
-				auto v = stmt.column_text(i);
-				if (v.size() == 0)
+				auto vt = stmt.column_text(i);
+				if (vt.size() == 0)
 					return OPER("");
+				fms::view v(vt.data(), (int)vt.size());
 				struct tm tm;
 				if (fms::parse_tm(v, &tm)) {
-					return OPER(to_julian(_mkgmtime(&tm)));
+					return OPER(to_excel(_mkgmtime(&tm)));
 				}
 				else {
 					return ErrValue;
 				}
 			}
-			*/
 			if (SQLITE_INTEGER == dt.type) {
 				time_t t = dt.value.i;
 				if (t) {
-					return OPER(to_julian(t));
+					return OPER(to_excel(t));
 				}
 			}
 			else if (SQLITE_FLOAT == dt.type) {
@@ -386,6 +426,7 @@ namespace xll {
 				ret = stmt.step();
 			}
 			ensure(SQLITE_DONE == ret || !__FUNCTION__ ": step not done");
+			ensure(result.size() % c == 0);
 			result.reshape(result.size() / c, c);
 		}
 		else {

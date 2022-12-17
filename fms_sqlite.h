@@ -51,6 +51,18 @@ X("DATETIME", _NUMERIC, _INTEGER, _int64) \
 
 // DATE and DATETIME are 64-bit time_t
 
+#define SQLITE_NAME(a,b) {a, b},
+inline const std::map<int, const char*> sqlite_type_name = {
+	SQLITE_TYPE_ENUM(SQLITE_NAME)
+};
+#undef SQLITE_NAME
+
+#define SQLITE_TYPE(a,b) {b, a},
+inline const std::map<std::string, int> sqlite_type_value = {
+	SQLITE_TYPE_ENUM(SQLITE_TYPE)
+};
+#undef SQLITE_TYPE
+
 // bind and retrieve sqlite data
 #define SQL_DATA_TYPE(a,b,c,d) { a, SQLITE##c, sqlite3_bind##d, sqlite3_column##d }, 
 inline const struct sqlite_datum {
@@ -78,6 +90,7 @@ inline sqlite_datum lookup_datum(const char* sql)
 #define SQLITE_DATETIME -2
 #define SQLITE_BOOLEAN -3
 
+// declared type in CREATE TABLE
 // type, affinity, enum, category
 #define SQLITE_DECLTYPE(X) \
 X("INT", "INTEGER", SQLITE_INTEGER, 1) \
@@ -104,63 +117,29 @@ X("DOUBLE PRECISION", "REAL", SQLITE_FLOAT, 4) \
 X("FLOAT", "REAL", SQLITE_FLOAT, 4) \
 X("NUMERIC", "NUMERIC", SQLITE_FLOAT, 5) \
 X("DECIMAL(?,?)", "NUMERIC", SQLITE_FLOAT, 5) \
-X("BOOLEAN", "NUMERIC", SQLITE_INTEGER, 5) \
-X("DATE", "NUMERIC", SQLITE_FLOAT, 5) \
-X("DATETIME", "NUMERIC", SQLITE_FLOAT, 5) \
+X("BOOLEAN", "NUMERIC", SQLITE_BOOLEAN, 5) \
+X("DATE", "NUMERIC", SQLITE_DATETIME, 5) \
+X("DATETIME", "NUMERIC", SQLITE_DATETIME, 5) \
+
+
+#define SQLITE_DECL(a,b,c,d) {a, c},
+inline const std::map<std::string, int> sqlite_decltype_map = {
+	SQLITE_DECLTYPE(SQLITE_DECL)
+};
+#undef SQLITE_DECL
+
+inline int sqlite_decltype(const char* type)
+{
+	if (!type || !*type) {
+		return SQLITE_TEXT;
+	}
+
+	const auto& t = sqlite_decltype_map.find(type);// std::string(type));
+
+	return t != sqlite_decltype_map.end() ? t->second : SQLITE_TEXT;
+}
 
 namespace sqlite {
-
-#define SQLITE_NAME(a,b) {a, b},
-	inline const std::map<int, const char*> type_name = {
-		SQLITE_TYPE_ENUM(SQLITE_NAME)
-	};
-#undef SQLITE_NAME
-
-#define SQLITE_TYPE(a,b) {b, a},
-	inline const std::map<std::string, int> type_value = {
-		SQLITE_TYPE_ENUM(SQLITE_TYPE)
-	};
-#undef SQLITE_TYPE
-
-	// declared type in CREATE TABLE
-	inline int type(const char* str)
-	{
-		if (!str || !*str) {
-			return SQLITE_TEXT;
-		}
-		switch (*str++) {
-		case 'B':
-			return *str == 'O' ? SQLITE_INTEGER : SQLITE_BLOB;
-		case 'C':
-		case 'V':
-			return SQLITE_TEXT;
-		case 'D':
-		case 'F':
-		case 'R':
-			return SQLITE_FLOAT;
-		case 'I':
-		case 'M':
-		case 'S':
-		case 'U':
-			return SQLITE_INTEGER;
-		case 'N':
-			return *str == 'U' ? SQLITE_FLOAT : SQLITE_TEXT;
-		case 'T':
-			return *str == 'I' ? SQLITE_INTEGER : SQLITE_TEXT;
-		}
-
-		return SQLITE_UNKNOWN;
-	}
-
-#ifdef _DEBUG
-	inline int test_type()
-	{
-#define TYPE_TEST(a,b,c,d) if (c != sqlite::type(a)) return -1 - __COUNTER__;
-		SQLITE_DECLTYPE(TYPE_TEST)
-#undef TYPE_TEST
-			return 0;
-	}
-#endif // _DEBUG
 
 	// sqlite datetime
 	struct datetime {
@@ -368,11 +347,10 @@ namespace sqlite {
 		{
 			return sqlite3_column_decltype(pstmt, i);
 		}
+
 		int type(int i) const
 		{
-			int t = sqlite::type(column_decltype(i));
-
-			return SQLITE_UNKNOWN ? column_type(i) : t;
+			return ::sqlite_decltype(column_decltype(i));
 		}
 
 		// 
@@ -469,15 +447,19 @@ namespace sqlite {
 	}
 
 	// table info
-	// name	type	notnull	dflt_value	pk
 	struct table_info {
 
 		std::vector<std::string> name;
 		std::vector<std::string> type;
-		std::vector<int> not_null;
+		std::vector<int> notnull;
 		std::vector<std::string> dflt_value;
 		std::vector<int> pk;
 
+		table_info()
+		{ }
+		table_info(size_t n)
+			: name(n), type(n), notnull(n), dflt_value(n), pk(n)
+		{ }
 		table_info(sqlite::db& db, const std::string_view& table)
 		{
 			sqlite::stmt stmt(db);
@@ -486,11 +468,10 @@ namespace sqlite {
 			stmt.prepare(query.c_str());
 
 			while (SQLITE_ROW == stmt.step()) {
-				name.emplace_back(std::string(stmt.column_text(1)));
-				type.emplace_back(std::string(stmt.column_text(2)));
-				not_null.push_back(stmt.column_int(3));
-				dflt_value.emplace_back(std::string(stmt.column_text(4)));
-				pk.push_back(stmt.column_int(5));
+				push_back(stmt.column_text(1), 
+					stmt.column_text(2), 
+					stmt.column_int(3),
+					stmt.column_text(4),stmt.column_int(5));
 			}
 			// ensure(row == SQLITE_DONE);
 		}
@@ -498,6 +479,72 @@ namespace sqlite {
 		size_t size() const
 		{
 			return name.size();
+		}
+
+		table_info& push_back(
+			const std::string_view& _name,
+			const std::string_view& _type,
+			const int _notnull = 0,
+			const std::string_view& _dflt_value = "",
+			const int _pk = 0)
+		{
+			name.emplace_back(_name);
+			type.emplace_back(_type);
+			notnull.push_back(_notnull);
+			dflt_value.emplace_back(_dflt_value);
+			pk.push_back(_pk);
+
+			return *this;
+		}
+
+		std::string schema() const
+		{
+			std::string sql("(");
+			std::string comma("");
+			for (size_t i = 0; i < size(); ++i) {
+				sql.append(comma);
+				comma = ", ";
+				sql.append(name[i]);
+				sql.append(" ");
+				sql.append(type[i]);
+				if (pk[i]) {
+					sql.append(" PRIMARY KEY");
+				}
+				if (notnull[i]) {
+					sql.append(" NOT NULL");
+				}
+				if (dflt_value[i] != "") {
+					sql.append(" DEFAULT ('");
+					sql.append(dflt_value[i]);
+					sql.append("')");
+				}
+			}
+			sql.append(")");
+
+			return sql;
+		}
+
+		std::string insert_values(const std::string_view& table) const
+		{
+			auto sql = std::string(" INSERT INTO ") + table_name(table) + " (";
+			std::string comma("");
+			for (size_t i = 0; i < size(); ++i) {
+				sql.append(comma);
+				comma = ", ";
+				sql.append(name[i]);
+			}
+			sql.append(")");
+			sql.append(" VALUES (");
+			comma = "";
+			for (size_t i = 0; i < size(); ++i) {
+				sql.append(comma);
+				comma = ", ";
+				sql.append("@");
+				sql.append(name[i]);
+			}
+			sql.append(")");
+
+			return sql;
 		}
 	};
 #if 0

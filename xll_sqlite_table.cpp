@@ -135,6 +135,7 @@ HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const OPER
 	return db;
 }
 #endif // 0
+
 AddIn xai_sqlite_create_table(
 	Function(XLL_HANDLEX, "xll_sqlite_create_table", CATEGORY ".CREATE_TABLE")
 	.Arguments({
@@ -152,73 +153,54 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 {
 #pragma XLLEXPORT
 	try {
-		ensure(pdata && *pdata);
-		ensure(!pcolumns || pcolumns->is_missing() || columns(*pdata) == size(*pcolumns));
-		ensure(!ptypes || ptypes->is_missing() 
-			|| (columns(*pdata) == size(*ptypes) && rows(*pdata) > 1));
+
+		unsigned row = 0; // first row of data
+		const OPER& data = *pdata;
+
+		if (pcolumns->is_missing()) {
+			row = 1; // first row has column names
+		}
+
+		sqlite::table_info ti(data.columns());		
+		for (unsigned j = 0; j < data.columns(); ++j) {
+			OPER namej = row == 0 ? (*pcolumns)[j] : data(0, j);
+			namej = namej ? namej : OPER("col") & OPER(j);
+			ti.name[j] = namej.to_string();
+			
+			if (ptypes->is_missing()) {
+				ti.type[j] = type_name(data(row, j));
+			}
+			else {
+				ti.type[j] = (*ptypes)[j].to_string();
+			}
+		}		
 
 		handle<sqlite::db> db_(db);
 		ensure(db_);
 
-		const auto dtie = std::string("DROP TABLE IF EXISTS [") + table + "]";
+		const auto dtie = std::string("DROP TABLE IF EXISTS ") + sqlite::table_name(table);
 		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, dtie.c_str(), 0, 0, 0));
 
-		const OPER& data = *pdata;
-		const OPER& column = *pcolumns;
-		const OPER& type = *ptypes;
-
-		OPER schema(data.columns(), 2);
-		for (unsigned j = 0; j < schema.rows(); ++j) {
-			schema(j, 0) = OPER("[") & (column ? column[j] : data(0, j)) & OPER("]");
-			if (type) {
-				const OPER& typej = Excel(xlfUpper, type[j]);
-				schema(j, 1) = typej ? typej : type_name(data(1, j));
-			}
-			else {
-				schema(j, 1) = type_name(data(1, j));
-			}
-		}
-		const auto ct = std::string("CREATE TABLE [") + table + "]("
-			+ to_string(schema, " ", ", ") + ")";
+		const auto ct = std::string("CREATE TABLE ") 
+			+ sqlite::table_name(table)
+			+ ti.schema();
 
 		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, ct.c_str(), 0, 0, 0));
 
 		sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
 
-		auto ii = std::string("INSERT INTO [") + table + "] VALUES(?1";
-		for (unsigned i = 2; i <= data.columns(); ++i) {
-			char buf[4];
-			ii += ", ?";
-			ii += itoa(i, buf, 10);
-		}
-		ii += ")";
 		sqlite::stmt stmt(*db_);
-		stmt.prepare(ii);
+		stmt.prepare(ti.insert_values(table));
 
-		for (unsigned i = column.is_missing(); i < data.rows(); ++i) {			
+		std::vector<int> decl(data.columns());
+		for (unsigned j = row; j < data.columns(); ++j) {
+			decl[j] = ::sqlite_decltype(ti.type[j].c_str());
+		}
+
+		for (unsigned i = row; i < data.rows(); ++i) {			
 			for (unsigned j = 0; j < data.columns(); ++j) {
 				const OPER& oij = data(i, j);
-
-				if (oij.is_nil() || oij.is_str() && oij.val.str[0] == 0) {
-					stmt.bind(j + 1);
-				}
-				else if (oij.is_str()) {
-					auto v = view(oij);
-					tm tm;
-					if (fms::parse_tm(v, &tm)) {
-						time_t t = _mkgmtime(&tm);
-						stmt.bind(j + 1, t);
-					}
-					stmt.bind(j + 1, std::wstring_view(oij.val.str + 1, oij.val.str[0]), SQLITE_STATIC);
-				}
-				else {
-					if (Excel(xlfLeft, schema(j, 1), OPER(4)) == "DATE") {
-						stmt.bind(j + 1, to_time(oij.as_num()));
-					}
-					else {
-						stmt.bind(j + 1, oij.as_num());
-					}
-				}
+				bind(stmt, j + 1, oij, decl[j]);
 			}
 			stmt.step();
 			stmt.reset();
@@ -266,7 +248,7 @@ HANDLEX WINAPI xll_sqlite_create_table_as(HANDLEX db, const char* table, LPOPER 
 			select = to_string(*pselect, " ", " ");
 		}
 
-		const std::string cta = std::string("CREATE TABLE [") + table + "] AS " + select;
+		const std::string cta = std::string("CREATE TABLE ") + sqlite::table_name(table) + " AS " + select;
 		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, cta.c_str(), 0, 0, 0));
 	}
 	catch (const std::exception& ex) {
