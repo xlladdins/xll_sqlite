@@ -7,6 +7,7 @@
 #include <vector>
 #include "sqlite-amalgamation-3390400/sqlite3.h"
 
+// call OP and throw on error
 #define FMS_SQLITE_OK(DB, OP) { int status = OP; if (SQLITE_OK != status) \
 	throw std::runtime_error(sqlite3_errmsg(DB)); }
 
@@ -18,7 +19,7 @@ X(SQLITE_TEXT,    "TEXT")    \
 X(SQLITE_BLOB,    "BLOB")    \
 X(SQLITE_NULL,    "NULL")    \
 
-// SQL, afinity, SQLITE, bind
+// SQL, affinity, SQLITE, bind
 #define SQLITE_DATA_TYPE(X) \
 X("INT", _INTEGER, _INTEGER, _int) \
 X("INTEGER", _INTEGER, _INTEGER, _int) \
@@ -50,6 +51,7 @@ X("DATETIME", _NUMERIC, _INTEGER, _int64) \
 
 // DATE and DATETIME are 64-bit time_t
 
+// bind and retrieve sqlite data
 #define SQL_DATA_TYPE(a,b,c,d) { a, SQLITE##c, sqlite3_bind##d, sqlite3_column##d }, 
 inline const struct sqlite_datum {
 	const char* sql; int type; void* bind; void* column;
@@ -127,23 +129,23 @@ namespace sqlite {
 			return SQLITE_TEXT;
 		}
 		switch (*str++) {
-		case 'B': 
+		case 'B':
 			return *str == 'O' ? SQLITE_INTEGER : SQLITE_BLOB;
-		case 'C': 
-		case 'V': 
+		case 'C':
+		case 'V':
 			return SQLITE_TEXT;
-		case 'D': 
-		case 'F': 
-		case 'R': 
+		case 'D':
+		case 'F':
+		case 'R':
 			return SQLITE_FLOAT;
-		case 'I': 
-		case 'M': 
-		case 'S': 
-		case 'U': 
+		case 'I':
+		case 'M':
+		case 'S':
+		case 'U':
 			return SQLITE_INTEGER;
-		case 'N': 
+		case 'N':
 			return *str == 'U' ? SQLITE_FLOAT : SQLITE_TEXT;
-		case 'T': 
+		case 'T':
 			return *str == 'I' ? SQLITE_INTEGER : SQLITE_TEXT;
 		}
 
@@ -156,7 +158,7 @@ namespace sqlite {
 #define TYPE_TEST(a,b,c,d) if (c != sqlite::type(a)) return -1 - __COUNTER__;
 		SQLITE_DECLTYPE(TYPE_TEST)
 #undef TYPE_TEST
-		return 0;
+			return 0;
 	}
 #endif // _DEBUG
 
@@ -301,7 +303,7 @@ namespace sqlite {
 		// text, make copy by default
 		stmt& bind(int i, const std::string_view& str, void(*cb)(void*) = SQLITE_TRANSIENT)
 		{
-			FMS_SQLITE_OK(pdb, sqlite3_bind_text(pstmt, i, str.data(), 
+			FMS_SQLITE_OK(pdb, sqlite3_bind_text(pstmt, i, str.data(),
 				static_cast<int>(str.size()), cb));
 
 			return *this;
@@ -309,9 +311,9 @@ namespace sqlite {
 		// text16 with length in characters
 		stmt& bind(int i, const std::wstring_view& str, void(*cb)(void*) = SQLITE_TRANSIENT)
 		{
-			FMS_SQLITE_OK(pdb, sqlite3_bind_text16(pstmt, i, (const void*)str.data(), 
-				static_cast<int>(2*str.size()), cb));
-		
+			FMS_SQLITE_OK(pdb, sqlite3_bind_text16(pstmt, i, (const void*)str.data(),
+				static_cast<int>(2 * str.size()), cb));
+
 			return *this;
 		}
 
@@ -369,7 +371,7 @@ namespace sqlite {
 		int type(int i) const
 		{
 			int t = sqlite::type(column_decltype(i));
-			
+
 			return SQLITE_UNKNOWN ? column_type(i) : t;
 		}
 
@@ -448,23 +450,27 @@ namespace sqlite {
 		{
 			switch (column_type(i)) {
 			case SQLITE_FLOAT:
-				return datetime{ .value = {.f = column_double(i)}, .type = SQLITE_FLOAT};
+				return datetime{ .value = {.f = column_double(i)}, .type = SQLITE_FLOAT };
 			case SQLITE_INTEGER:
 				return datetime{ .value = {.i = column_int64(i)}, .type = SQLITE_INTEGER };
 			case SQLITE_TEXT:
-				return datetime{ .value = {.t = sqlite3_column_text(pstmt, i)}, .type = SQLITE_TEXT};
+				return datetime{ .value = {.t = sqlite3_column_text(pstmt, i)}, .type = SQLITE_TEXT };
 			}
 
-			return datetime{.value = { .t = nullptr}, .type = SQLITE_UNKNOWN};
+			return datetime{ .value = {.t = nullptr}, .type = SQLITE_UNKNOWN };
 		}
 	};
+
+	inline std::string table_name(const std::string_view& table)
+	{
+		return table.starts_with('[')
+			? std::string(table)
+			: std::string("[") + std::string(table) + "]";
+	}
+
 	// table info
 	// name	type	notnull	dflt_value	pk
-	inline std::string table_name(const char* table)
-	{
-		return table && *table == '[' ? std::string(table) : std::string("[") + table + "]";
-	}
-		struct table_info {
+	struct table_info {
 
 		std::vector<std::string> name;
 		std::vector<std::string> type;
@@ -472,11 +478,11 @@ namespace sqlite {
 		std::vector<std::string> dflt_value;
 		std::vector<int> pk;
 
-		table_info(sqlite::db& db, const char* table)
+		table_info(sqlite::db& db, const std::string_view& table)
 		{
 			sqlite::stmt stmt(db);
 			auto query = std::string("PRAGMA table_info(") + table_name(table) + ");";
-			
+
 			stmt.prepare(query.c_str());
 
 			while (SQLITE_ROW == stmt.step()) {
@@ -516,7 +522,7 @@ namespace sqlite {
 		{
 			return _done();
 		}
-		void step() 
+		void step()
 		{
 			return _step();
 		}
@@ -569,7 +575,7 @@ namespace sqlite {
 	inline void insert(sqlite3* db, const char* table, size_t len, cursor& cur)
 	{
 		sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
-		
+
 		std::string ii("INSERT INTO [");
 		if (len <= 0) {
 			len = strlen(table);
@@ -583,7 +589,7 @@ namespace sqlite {
 			ii.append(buf);
 		}
 		ii.append(");");
-		
+
 		sqlite::stmt stmt(db);
 		stmt.prepare(ii.c_str(), static_cast<int>(ii.length()));
 
@@ -616,6 +622,6 @@ namespace sqlite {
 
 		sqlite3_exec(db, "COMMIT TRANSACTION", NULL, NULL, NULL);
 
-	}
+		}
 #endif // 0
-} // sqlite
+	} // sqlite
