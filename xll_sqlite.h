@@ -1,5 +1,7 @@
 // xll_sqlite.h
 #pragma once
+#pragma warning(disable : 5103)
+#pragma warning(disable : 5105)
 #include <charconv>
 #include <numeric>
 #include "fms_sqlite.h"
