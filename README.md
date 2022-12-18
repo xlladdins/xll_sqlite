@@ -43,13 +43,14 @@ The new table will contain the result of executing the statement.
 <dt>Do I have to do the sweep out ranges, F2, Ctrl-Shift-Enter, rinse and repeat to
 get the output of range-valued functions?</dt>
 <dd>Not if you use a version of Excel with 
-[dynamic arrays](https://techcommunity.microsoft.com/t5/excel-blog/preview-of-dynamic-arrays-in-excel/ba-p/252944)
+<a href="https://techcommunity.microsoft.com/t5/excel-blog/preview-of-dynamic-arrays-in-excel/ba-p/252944">
+dynamic arrays</a>
 </dd>
 
 <dt>What are those funny numbers coming out of commands that start with a backslash (`\`)?</dt>
 <dd>They are  64-bit
 floating point numbers with the same bits as the address in memory of the underlying C++ object.
-See [handles](https://github.com/xlladdins/xll#handle).
+See <a href="https://github.com/xlladdins/xll#handle">handles</a>
 </dd>
 
 <dt>My SQL queries are too big to put in one cell.</dt>
@@ -57,5 +58,5 @@ See [handles](https://github.com/xlladdins/xll#handle).
 using a space character before being sent to sqlite.</dd>
 
 <dt>How did you create this add-in?</dt>
-<dd>Using my [xll](https://github.com/xlladdins/xll) library.</dd>
+<dd>Using my <a href="https://github.com/xlladdins/xll">xll</a> library.</dd>
 </dl>
