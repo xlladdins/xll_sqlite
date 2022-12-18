@@ -460,10 +460,10 @@ namespace sqlite {
 		table_info(size_t n)
 			: name(n), type(n), notnull(n), dflt_value(n), pk(n)
 		{ }
-		table_info(sqlite::db& db, const std::string_view& table)
+		table_info(sqlite3* db, const std::string_view& name)
 		{
 			sqlite::stmt stmt(db);
-			auto query = std::string("PRAGMA table_info(") + table_name(table) + ");";
+			auto query = std::string("PRAGMA table_info(") + table_name(name) + ");";
 
 			stmt.prepare(query.c_str());
 
