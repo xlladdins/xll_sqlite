@@ -1,6 +1,6 @@
 # xll_sqlite
 
-Use [sqlite](https://www.sqlite.org/) from Excel.
+Use [SQLite](https://www.sqlite.org/) from Excel.
 
 ## Usage
 
