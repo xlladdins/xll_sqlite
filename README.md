@@ -31,7 +31,7 @@ based on each value's Excel type.
 Statements are executed with [`=SQL.EXEC(stmt)`](https://www.sqlite.org/c3ref/exec.html).
 
 Sqlite tables are created from 
-[`=SQL.TABLE(db, name, data, _columns, _types)`](https://www.sqlite.org/lang_createtable.html).
+[`=SQL.CREATE_TABLE(db, name, data, _columns, _types)`](https://www.sqlite.org/lang_createtable.html).
 The `_columns` and `_types` arguments are optional. If `_columns` are not specified then
 the first row of `data` is used for column names. The allowed `_types` are those specified
 in the [Affinity Name Examples](https://www.sqlite.org/datatype3.html#affinity_name_examples).
