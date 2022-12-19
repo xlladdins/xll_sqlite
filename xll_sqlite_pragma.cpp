@@ -39,11 +39,11 @@ AddIn xai_sqlite_pragma(
 	Function(XLL_LPOPER, "xll_sqlite_pragma", CATEGORY ".PRAGMA")
 	.Arguments({
 		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
-		Arg(XLL_CSTRING4, "pragma", "is an optional pragma name."),
+		Arg(XLL_CSTRING4, "_pragma", "is an optional pragma name."),
 		Arg_nh
 		})
 	.Category(CATEGORY)
-	.FunctionHelp("Return all pragmas.")
+	.FunctionHelp("Call 'PRAGMA pragma' or return all pramas if omitted.")
 	.HelpTopic("https://www.sqlite.org/pragma.html")
 );
 LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma, BOOL no_headers)
@@ -92,19 +92,19 @@ AddIn xai_sqlite_table_info(
 	Function(XLL_LPOPER, "xll_sqlite_table_info", CATEGORY ".TABLE_INFO")
 	.Arguments({
 		Arg_db,
-		Arg(XLL_CSTRING4, "table", "is the name of the table."),
+		Arg(XLL_CSTRING4, "name", "is the name of the table."),
 		Arg_nh
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Call PRAGMA table_info(table).")
 	.HelpTopic("https://www.sqlite.org/pragma.html#pragma_table_info")
 );
-LPOPER WINAPI xll_sqlite_table_info(HANDLEX db, const char* table, bool no_headers)
+LPOPER WINAPI xll_sqlite_table_info(HANDLEX db, const char* name, bool no_headers)
 {
 #pragma XLLEXPORT
 	handle<sqlite::db> db_(db);
-	sqlite::table_info ti(*db_, table);
 
+	auto pragma = std::string("table_info(") + sqlite::table_name(name) + ")";
 
-	return xll_sqlite_pragma(db, (std::string("table_info(") + table + ")").c_str(), no_headers);
+	return xll_sqlite_pragma(db, pragma.c_str(), no_headers);
 }

@@ -2,6 +2,11 @@
 
 Use [sqlite](https://www.sqlite.org/) from Excel.
 
+## Usage
+
+Clone [xll_sqlite](https://github.com/xlladdins/xll_sqlite),
+open the `xll_sqlite.sln` and press `F5` to build and open Excel with the add-in loaded.
+
 Open or create a sqlite database using `\SQL.DB(file, options)`.
 If no arguments are specified a temporary in-memory database is created.
 [`SQLITE_OPEN_XXX()`](https://www.sqlite.org/c3ref/c_open_autoproxy.html) 
@@ -9,7 +14,7 @@ enumerations are provided for `options`. Add them to get the mask you want.
 
 Get the big picture with [`SQL.SCHEMA(db)`](https://www.sqlite.org/schematab.html).
 The common pragmas [`SQL.TABLE_LIST(db)`](https://www.sqlite.org/pragma.html#pragma_table_list)
-and [`SQL.TABLE_INFO(db)`](https://www.sqlite.org/pragma.html#pragma_table_info)
+and [`SQL.TABLE_INFO(db, name)`](https://www.sqlite.org/pragma.html#pragma_table_info)
 are provided in addition to [`SQL.PRAGMA(db, pragma)`](https://www.sqlite.org/pragma.html)
 that calls `PRAGMA pragma`.
 
@@ -20,7 +25,7 @@ You can create a sqlite statement with `SQL.STMT(db)`
 and use the result as the first argument to 
 [`SQL.PREPARE(stmt, sql)`](https://www.sqlite.org/c3ref/prepare.html).
 Bind parameter values with [`SQL.BIND(stmd, range)`](https://www.sqlite.org/c3ref/bind_blob.html)
-where `range` is one-dimensional to specify positional parameters or a two columns
+where `range` is one-dimensional to specify positional parameters or a two column
 range of key-value pairs to bind based on the key name. The binding type is
 based on each value's Excel type.
 Statements are executed with [`SQL.EXEC(stmt)`](https://www.sqlite.org/c3ref/exec.html).
