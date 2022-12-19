@@ -64,11 +64,15 @@ using a space character before being sent to sqlite.</dd>
 
 <dt>Why is it so fast?</dt>
 <dd>Because it uses
-[memory mapped](https://github.com/xlladdins/xll_sqlite/blob/master/win_mem_view.h) files.</dd>
+[memory mapped](https://github.com/xlladdins/xll_sqlite/blob/master/win_mem_view.h) files.
+Things will break when you try to return over 8GB of data.</dd>
 
 <dt>How did you create this add-in?</dt>
 <dd>Using my <a href="https://github.com/xlladdins/xll">xll</a> library.
 You can use it to embed C++ in Excel. 
 </dd>
+
+<dt>Why does is appear to be forked from <a href="https://github.com/Diamond-Corp">Diamond-Corp</a>?
+<dd>I have no idea. Time to have a chat with Satya about slimeballs showing up on his site.</dd>
 
 </dl>
