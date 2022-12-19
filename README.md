@@ -2,10 +2,10 @@
 
 Use [sqlite](https://www.sqlite.org/) from Excel.
 
-Open and/or create a sqlite database using `\SQL.DB(file, options)`.
+Open or create a sqlite database using `\SQL.DB(file, options)`.
 If no arguments are specified a temporary in-memory database is created.
 [`SQLITE_OPEN_XXX()`](https://www.sqlite.org/c3ref/c_open_autoproxy.html) 
-enumerations are provided for `options`.
+enumerations are provided for `options`. Add them to get the mask you want.
 
 Get the big picture with [`SQL.SCHEMA(db)`](https://www.sqlite.org/schematab.html).
 The common pragmas [`SQL.TABLE_LIST(db)`](https://www.sqlite.org/pragma.html#pragma_table_list)
@@ -21,7 +21,7 @@ and use the result as the first argument to
 [`SQL.PREPARE(stmt, sql)`](https://www.sqlite.org/c3ref/prepare.html).
 Bind parameter values with [`SQL.BIND(stmd, range)`](https://www.sqlite.org/c3ref/bind_blob.html)
 where `range` is one-dimensional to specify positional parameters or a two columns
-range of key-value pairs to bind based on the key name. The type of binding is
+range of key-value pairs to bind based on the key name. The binding type is
 based on each value's Excel type.
 Statements are executed with [`SQL.EXEC(stmt)`](https://www.sqlite.org/c3ref/exec.html).
 
@@ -40,16 +40,16 @@ The new table will contain the result of executing the statement.
 
 <dl>
 
-<dt>Do I have to do the sweep out ranges, F2, Ctrl-Shift-Enter, rinse and repeat to
-get the output of range-valued functions?</dt>
-<dd>Not if you use a version of Excel with 
+<dt>Do I have to to the sweep out ranges, F2, Ctrl-Shift-Enter, rinse and repeat, 
+then press Ctrl-Z when I see `#VALUE!`s to get the actual output of range-valued functions?</dt>
+<dd>Not if you use a modern version of Excel with 
 <a href="https://techcommunity.microsoft.com/t5/excel-blog/preview-of-dynamic-arrays-in-excel/ba-p/252944">
 dynamic arrays</a>
 </dd>
 
 <dt>What are those funny numbers coming out of commands that start with a backslash (`\`)?</dt>
 <dd>They are  64-bit
-floating point numbers with the same bits as the address in memory of the underlying C++ object.
+floating point C++ doubles with the same bits as the address in memory of the underlying C++ object.
 See <a href="https://github.com/xlladdins/xll#handle">handles</a>
 </dd>
 
@@ -58,5 +58,8 @@ See <a href="https://github.com/xlladdins/xll#handle">handles</a>
 using a space character before being sent to sqlite.</dd>
 
 <dt>How did you create this add-in?</dt>
-<dd>Using my <a href="https://github.com/xlladdins/xll">xll</a> library.</dd>
+<dd>Using my <a href="https://github.com/xlladdins/xll">xll</a> library.
+You can use it to embed C++ in Excel. 
+</dd>
+
 </dl>

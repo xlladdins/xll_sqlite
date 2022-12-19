@@ -178,6 +178,8 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 		handle<sqlite::db> db_(db);
 		ensure(db_);
 
+		sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
+
 		const auto dtie = std::string("DROP TABLE IF EXISTS ") + sqlite::table_name(table);
 		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, dtie.c_str(), 0, 0, 0));
 
@@ -187,13 +189,11 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 
 		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, ct.c_str(), 0, 0, 0));
 
-		sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
-
 		sqlite::stmt stmt(*db_);
 		stmt.prepare(ti.insert_values(table));
 
-		std::vector<int> decl(data.columns());
-		for (unsigned j = row; j < data.columns(); ++j) {
+		std::vector<int> decl(ti.size());
+		for (unsigned j = 0; j < ti.size(); ++j) {
 			decl[j] = ::sqlite_decltype(ti.type[j].c_str());
 		}
 
