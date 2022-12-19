@@ -64,8 +64,8 @@ using a space character before being sent to sqlite.</dd>
 
 <dt>Why is it so fast?</dt>
 <dd>Because it uses
-[memory mapped](https://github.com/xlladdins/xll_sqlite/blob/master/win_mem_view.h) files.
-Things will break when you try to return over 8GB of data.</dd>
+<a href="https://github.com/xlladdins/xll_sqlite/blob/master/win_mem_view.h">memory mapped</a>
+files. Things will break when you try to return over 8GB of data.</dd>
 
 <dt>How did you create this add-in?</dt>
 <dd>Using my <a href="https://github.com/xlladdins/xll">xll</a> library.
