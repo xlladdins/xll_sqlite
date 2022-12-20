@@ -1,6 +1,7 @@
 # xll_sqlite
 
-Use [SQLite](https://www.sqlite.org/) from Excel.
+Use [SQLite](https://www.sqlite.org/) from Excel. Think of it as the 
+[`sqlite3`](https://www.sqlite.org/cli.html#getting_started) command line shell on steroids.
 
 ## Usage
 
