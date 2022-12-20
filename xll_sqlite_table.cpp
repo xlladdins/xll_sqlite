@@ -1,4 +1,6 @@
 // xll_sqlite_table.cpp
+#pragma warning(disable : 5103)
+#pragma warning(disable : 5105)
 #include "xll_is_as.h"
 #include "xll_sqlite.h"
 

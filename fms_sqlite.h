@@ -632,7 +632,7 @@ namespace sqlite {
 			}
 			else if (is_text16(v)) {
 				const auto t = as_text16(v);
-				return sqlite3_bind_text(stmt, j, t.data(), 2 * (int)t.size(), SQLITE_TRANSIENT);
+				return sqlite3_bind_text16(stmt, j, t.data(), 2 * (int)t.size(), SQLITE_TRANSIENT);
 			}
 			else if (is_double(v)) {
 				return sqlite3_bind_double(stmt, j, as_double(v));
