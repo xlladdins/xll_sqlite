@@ -140,7 +140,7 @@ AddIn xai_sqlite_create_table(
 	Function(XLL_HANDLEX, "xll_sqlite_create_table", CATEGORY ".CREATE_TABLE")
 	.Arguments({
 		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
-		Arg(XLL_CSTRING4, "table", "is the name of the table."),
+		Arg(XLL_CSTRING4, "name", "is the name of the table."),
 		Arg(XLL_LPOPER, "data", "is a range of data."),
 		Arg(XLL_LPOPER, "_columns", "is an optional range of column names."),
 		Arg(XLL_LPOPER, "_types", "is an optional range of column types."),
@@ -149,7 +149,7 @@ AddIn xai_sqlite_create_table(
 	.FunctionHelp("Create a sqlite table in a database.")
 	.HelpTopic("https://www.sqlite.org/lang_createtable.html")
 );
-HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pdata, LPOPER pcolumns, LPOPER ptypes)
+HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* name, LPOPER pdata, LPOPER pcolumns, LPOPER ptypes)
 {
 #pragma XLLEXPORT
 	try {
@@ -161,7 +161,7 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 			row = 1; // first row has column names
 		}
 
-		sqlite::table_info ti(data.columns());		
+		sqlite::table_info<XLOPER12> ti(data.columns());		
 		for (unsigned j = 0; j < data.columns(); ++j) {
 			OPER namej = row == 0 ? (*pcolumns)[j] : data(0, j);
 			namej = namej ? namej : OPER("col") & OPER(j);
@@ -180,27 +180,18 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 
 		sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
 
-		const auto dtie = std::string("DROP TABLE IF EXISTS ") + sqlite::table_name(table);
-		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, dtie.c_str(), 0, 0, 0));
-
-		const auto ct = std::string("CREATE TABLE ") 
-			+ sqlite::table_name(table)
-			+ ti.schema();
-
-		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, ct.c_str(), 0, 0, 0));
-
-		sqlite::stmt stmt(*db_);
-		stmt.prepare(ti.insert_values(table));
+		const auto tname = sqlite::table_name(name);
+		ensure(SQLITE_OK == ti.create_table(*db_, tname));
 
 		std::vector<int> decl(ti.size());
 		for (unsigned j = 0; j < ti.size(); ++j) {
 			decl[j] = ::sqlite_decltype(ti.type[j].c_str());
 		}
 
-		for (unsigned i = row; i < data.rows(); ++i) {			
+		sqlite::stmt stmt(ti.insert_values(*db_, tname));
+		for (unsigned i = row; i < data.rows(); ++i) {
 			for (unsigned j = 0; j < data.columns(); ++j) {
-				const OPER& oij = data(i, j);
-				bind(stmt, j + 1, oij, decl[j]);
+				bind(stmt, j + 1, data(i, j), decl[j]);
 			}
 			stmt.step();
 			stmt.reset();
@@ -217,6 +208,7 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 	return db;
 }
 
+// !!!this should only take a stmt, create the table, and exec the stmt
 AddIn xai_sqlite_create_table_as(
 	Function(XLL_HANDLEX, "xll_sqlite_create_table_as", CATEGORY ".CREATE_TABLE_AS")
 	.Arguments({

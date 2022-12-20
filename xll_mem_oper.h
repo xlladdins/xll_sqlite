@@ -40,6 +40,7 @@ namespace xll::mem {
 		{
 			xloper.reset(len);
 			str.reset(len);
+			xltype = xltypeNil;
 		}
 
 		OPER()
@@ -52,7 +53,7 @@ namespace xll::mem {
 			val = o.val;
 		}
 		OPER& operator=(const OPER&) = delete;
-		OPER& operator=(OPER&& o) 
+		OPER& operator=(OPER&& o) noexcept
 		{
 			if (this != &o) {
 				xltype = o.xltype;
@@ -88,11 +89,12 @@ namespace xll::mem {
 
 		OPER& reshape(xrw r, xcol c)
 		{
-			ensure(xltype == xltypeMulti);
-			ensure(r * c == size());
+			if (xltype == xltypeMulti) {
+				ensure(r * c == size());
 
-			val.array.rows = r;
-			val.array.columns = c;
+				val.array.rows = r;
+				val.array.columns = c;
+			}
 
 			return *this;
 		}

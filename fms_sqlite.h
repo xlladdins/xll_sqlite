@@ -194,6 +194,21 @@ namespace sqlite {
 		}
 		stmt(const stmt&) = delete;
 		stmt& operator=(const stmt&) = delete;
+		stmt(stmt&& _stmt)
+		{
+			*this = std::move(_stmt);
+		}
+		stmt& operator=(stmt&& _stmt)
+		{
+			if (this != &_stmt) {
+				pdb = std::exchange(_stmt.pdb, nullptr);
+				pstmt = std::exchange(_stmt.pstmt, nullptr);
+				ptail = std::exchange(_stmt.ptail, nullptr);
+			}
+
+			return *this;
+		}
+
 		~stmt()
 		{
 			if (pstmt) {
@@ -447,6 +462,7 @@ namespace sqlite {
 	}
 
 	// table info
+	template<class V> // V::is_/as_ conversions
 	struct table_info {
 
 		std::vector<std::string> name;
@@ -473,12 +489,6 @@ namespace sqlite {
 					stmt.column_int(3),
 					stmt.column_text(4),stmt.column_int(5));
 			}
-			// ensure(row == SQLITE_DONE);
-		}
-
-		size_t size() const
-		{
-			return name.size();
 		}
 
 		table_info& push_back(
@@ -495,6 +505,22 @@ namespace sqlite {
 			pk.push_back(_pk);
 
 			return *this;
+		}
+
+		size_t size() const
+		{
+			return name.size();
+		}
+
+		int parameter_index(const char* key) const
+		{
+			for (int i = 0; i < size(); ++i) {
+				if (name[i] == key) {
+					return i + 1;
+				}
+			}
+
+			return 0;
 		}
 
 		std::string schema() const
@@ -524,9 +550,30 @@ namespace sqlite {
 			return sql;
 		}
 
-		std::string insert_values(const std::string_view& table) const
+		int drop_table(sqlite3* db, const std::string_view& _name)
 		{
-			auto sql = std::string(" INSERT INTO ") + table_name(table) + " (";
+			auto sql = std::string("DROP TABLE IF EXISTS ") + table_name(_name);
+
+			return sqlite3_exec(db, sql.data(), nullptr, nullptr, nullptr);
+		}
+
+		int create_table(sqlite3* db, const std::string_view& _name)
+		{
+			drop_table(db, _name);
+
+			auto sql = std::string("CREATE TABLE ")
+				+ table_name(_name)
+				+ schema();
+
+			return sqlite3_exec(db, sql.data(), nullptr, nullptr, nullptr);
+		}
+
+		// prepare a statement for inserting values
+		sqlite::stmt insert_values(sqlite3* db, const std::string_view& _name) const
+		{
+			sqlite::stmt stmt(db);
+
+			auto sql = std::string(" INSERT INTO ") + table_name(_name) + " (";
 			std::string comma("");
 			for (size_t i = 0; i < size(); ++i) {
 				sql.append(comma);
@@ -544,7 +591,49 @@ namespace sqlite {
 			}
 			sql.append(")");
 
-			return sql;
+			stmt.prepare(sql);
+
+			return stmt;
+		}
+
+		int bind(sqlite3_stmt* stmt, int j, const V& v) const
+		{
+			if (is_text(v)) {
+				const auto t = as_text(v);
+				return sqlite3_bind_text(stmt, j, t.data(), (int)t.size(), SQLITE_TRANSIENT);
+			}
+			else if (is_text16(v)) {
+				const auto t = as_text16(v);
+				return sqlite3_bind_text(stmt, j, t.data(), 2 * (int)t.size(), SQLITE_TRANSIENT);
+			}
+			else if (is_double(v)) {
+				return sqlite3_bind_double(stmt, j, as_double(v));
+			}
+			else if (is_int(v)) {
+				return sqlite3_bind_int(stmt, j, as_int(v));
+			}
+			else if (is_int64(v)) {
+				return sqlite3_bind_int64(stmt, j, as_int64(v));
+			}
+			else if (is_null(v)) {
+				return sqlite3_bind_null(stmt, j);
+			}
+			else if (is_blob(v)) {
+				const auto& b = as_blob(v);
+				return sqlite3_bind_blob(stmt, j, b.data(), (int)b.size(), nullptr);
+			}
+
+			return SQLITE_MISUSE;
+		}
+		template<class V>
+		int bind(sqlite3_stmt* stmt, const char* key, const V& v) const
+		{
+			int j = parameter_index(key);
+			if (j == 0) {
+				throw std::runtime_error(__FUNCTION__ ": key not found");
+			}
+
+			return bind(stmt, j, v);
 		}
 	};
 #if 0

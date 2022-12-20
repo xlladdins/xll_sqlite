@@ -4,6 +4,7 @@
 #pragma warning(disable : 5105)
 #include <charconv>
 #include <numeric>
+#include "xll_is_as.h"
 #include "fms_sqlite.h"
 #include "fms_parse.h"
 #include "xll_mem_oper.h"
@@ -15,6 +16,13 @@
 #define CATEGORY "SQL"
 #endif
 
+// common arguments
+inline const auto Arg_db = xll::Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database.");
+inline const auto Arg_stmt = xll::Arg(XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
+inline const auto Arg_sql = xll::Arg(XLL_LPOPER, "sql", "is a SQL query to execute.");
+inline const auto Arg_bind = xll::Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
+inline const auto Arg_nh = xll::Arg(XLL_BOOL, "no_headers", "is a optional boolean value indicating not to return headers. Default is FALSE.");
+
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
 X(xltypeInt,     SQLITE_INTEGER, "INTEGER") \
@@ -25,13 +33,6 @@ X(xltypeBigData, SQLITE_BLOB,    "BLOB")    \
 X(xltypeNil,     SQLITE_NULL,    "NULL")    \
 
 namespace xll {
-
-	// common arguments
-	static const auto Arg_db   = Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database.");
-	static const auto Arg_stmt = Arg(XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
-	static const auto Arg_sql  = Arg(XLL_LPOPER, "sql", "is a SQL query to execute.");
-	static const auto Arg_bind = Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
-	static const auto Arg_nh   = Arg(XLL_BOOL, "no_headers", "is a optional boolean value indicating not to return headers. Default is FALSE.");
 
 	// xltype to sqlite basic type
 #define XLTYPE(a, b, c) {a, b},
@@ -186,7 +187,6 @@ namespace xll {
 		}
 	};
 #endif // 0
-
 	// time_t to Excel Julian date
 	inline double to_excel(time_t t)
 	{

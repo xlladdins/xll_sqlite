@@ -1,5 +1,5 @@
 ﻿// xll_sqlite_stmt.cpp - Sqlite3 bindings.
-#include <thread>
+//#include <thread>
 #include "xll_sqlite.h"
 
 using namespace xll;
