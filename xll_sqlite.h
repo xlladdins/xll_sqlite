@@ -4,7 +4,6 @@
 #pragma warning(disable : 5105)
 #include <charconv>
 #include <numeric>
-#include "xll_is_as.h"
 #include "fms_sqlite.h"
 #include "fms_parse.h"
 #include "xll_mem_oper.h"

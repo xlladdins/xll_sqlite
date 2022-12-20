@@ -1,4 +1,5 @@
 // xll_sqlite_table.cpp
+#include "xll_is_as.h"
 #include "xll_sqlite.h"
 
 using namespace xll;

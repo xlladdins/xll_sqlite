@@ -134,7 +134,7 @@ inline int sqlite_decltype(const char* type)
 		return SQLITE_TEXT;
 	}
 
-	const auto& t = sqlite_decltype_map.find(type);// std::string(type));
+	const auto& t = sqlite_decltype_map.find(type);
 
 	return t != sqlite_decltype_map.end() ? t->second : SQLITE_TEXT;
 }
@@ -194,11 +194,11 @@ namespace sqlite {
 		}
 		stmt(const stmt&) = delete;
 		stmt& operator=(const stmt&) = delete;
-		stmt(stmt&& _stmt)
+		stmt(stmt&& _stmt) noexcept
 		{
 			*this = std::move(_stmt);
 		}
-		stmt& operator=(stmt&& _stmt)
+		stmt& operator=(stmt&& _stmt) noexcept
 		{
 			if (this != &_stmt) {
 				pdb = std::exchange(_stmt.pdb, nullptr);
@@ -454,15 +454,34 @@ namespace sqlite {
 		}
 	};
 
-	inline std::string table_name(const std::string_view& table)
+	inline std::string quote(const std::string_view& s, char l, char r = 0)
 	{
-		return table.starts_with('[')
-			? std::string(table)
-			: std::string("[") + std::string(table) + "]";
+		std::string t(s);
+
+		r = r ? r : l;
+
+		if (!s.starts_with(l)) {
+			t.insert(t.begin(), l);
+		}
+		if (!s.ends_with(r)) {
+			t.insert(t.end(), r);
+		}
+
+		return t;
+	}
+	inline std::string table_name(const std::string_view& t)
+	{
+		return quote(t, '[', ']');
+	}
+	inline std::string variable_name(const std::string_view& v)
+	{
+		return quote(v, '\'');
 	}
 
-	// table info
-	template<class V> // V::is_/as_ conversions
+	// V is a variant type with free functions 
+	// `bool is_xxx(const V&)` and `xxx as_xxx(const V&)`
+	// for xxx in `blob`, `double`, `int`, `int64`, `null`, `text` and `text16` 
+	template<class V>
 	struct table_info {
 
 		std::vector<std::string> name;
@@ -476,10 +495,10 @@ namespace sqlite {
 		table_info(size_t n)
 			: name(n), type(n), notnull(n), dflt_value(n), pk(n)
 		{ }
-		table_info(sqlite3* db, const std::string_view& name)
+		table_info(sqlite3* db, const std::string_view& table)
 		{
 			sqlite::stmt stmt(db);
-			auto query = std::string("PRAGMA table_info(") + table_name(name) + ");";
+			auto query = std::string("PRAGMA table_info(") + table_name(table) + ");";
 
 			stmt.prepare(query.c_str());
 
@@ -523,6 +542,7 @@ namespace sqlite {
 			return 0;
 		}
 
+		// "(name type [modifiers], ...)"
 		std::string schema() const
 		{
 			std::string sql("(");
@@ -550,30 +570,38 @@ namespace sqlite {
 			return sql;
 		}
 
-		int drop_table(sqlite3* db, const std::string_view& _name)
+		int drop_table(sqlite3* db, const std::string_view& table)
 		{
-			auto sql = std::string("DROP TABLE IF EXISTS ") + table_name(_name);
+			auto sql = std::string("DROP TABLE IF EXISTS ") + table_name(table);
 
 			return sqlite3_exec(db, sql.data(), nullptr, nullptr, nullptr);
 		}
 
-		int create_table(sqlite3* db, const std::string_view& _name)
+		int create_table(sqlite3* db, const std::string_view& table)
 		{
-			drop_table(db, _name);
+			drop_table(db, table);
 
 			auto sql = std::string("CREATE TABLE ")
-				+ table_name(_name)
+				+ table_name(table)
 				+ schema();
 
 			return sqlite3_exec(db, sql.data(), nullptr, nullptr, nullptr);
 		}
 
 		// prepare a statement for inserting values
-		sqlite::stmt insert_values(sqlite3* db, const std::string_view& _name) const
+		// stmt = "INSERT INTO table(key, ...) VALUES (@key, ...)"
+		// for (row : rows) {
+		//   for ([k, v]: row) {
+		//     bind(stmt, k, v);
+		//   }
+		//   stmt.step();
+		//   stmt.reset();
+		// }
+		sqlite::stmt insert_values(sqlite3* db, const std::string_view& table) const
 		{
 			sqlite::stmt stmt(db);
 
-			auto sql = std::string(" INSERT INTO ") + table_name(_name) + " (";
+			auto sql = std::string(" INSERT INTO ") + table_name(table) + " (";
 			std::string comma("");
 			for (size_t i = 0; i < size(); ++i) {
 				sql.append(comma);
@@ -636,128 +664,5 @@ namespace sqlite {
 			return bind(stmt, j, v);
 		}
 	};
-#if 0
 
-	struct cursor {
-		virtual ~cursor()
-		{ }
-		int column_count() const
-		{
-			return _column_count();
-		}
-		// fundamental sqlite type
-		int column_type(int i) const
-		{
-			return _column_type(i);
-		}
-		const char* column_name(int i) const
-		{
-			return _column_name(i);
-		}
-		bool done() const
-		{
-			return _done();
-		}
-		void step()
-		{
-			return _step();
-		}
-		/*
-		std::span<void*> as_blob(int i) const
-		{
-			return _as_blob(i);
-		}
-		*/
-		double as_double(int i) const
-		{
-			return _as_double(i);
-		}
-		int as_int(int i) const
-		{
-			return _as_int(i);
-		}
-		std::string_view as_text(int i) const
-		{
-			return _as_text(i);
-		}
-		// JSON argument keys
-		double as_double(const char* name) const
-		{
-			return _as_double(name);
-		}
-		int as_int(const char* name) const
-		{
-			return _as_int(name);
-		}
-		std::string_view as_text(const char* name) const
-		{
-			return _as_text(name);
-		}
-	private:
-		virtual int _column_count() const = 0;
-		virtual int _column_type(int i) const = 0;
-		virtual const char* _column_name(int i) const = 0;
-		virtual bool _done() const = 0;
-		virtual void _step() = 0;
-		//virtual std::span<void*> _as_blob(int i) const = 0;
-		virtual double _as_double(int i) const = 0;
-		virtual int _as_int(int i) const = 0;
-		virtual std::string_view _as_text(int i) const = 0;
-		virtual double _as_double(const char* name) const = 0;
-		virtual int _as_int(const char* name) const = 0;
-		virtual std::string_view _as_text(const char* name) const = 0;
-	};
-
-	inline void insert(sqlite3* db, const char* table, size_t len, cursor& cur)
-	{
-		sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
-
-		std::string ii("INSERT INTO [");
-		if (len <= 0) {
-			len = strlen(table);
-		}
-		ii.append(table, len);
-		ii.append("] VALUES (?1");
-		char buf[8];
-		for (int i = 2; i <= cur.column_count(); ++i) {
-			ii.append(", ?");
-			sprintf_s(buf, "%d", i);
-			ii.append(buf);
-		}
-		ii.append(");");
-
-		sqlite::stmt stmt(db);
-		stmt.prepare(ii.c_str(), static_cast<int>(ii.length()));
-
-		while (!cur.done()) {
-			for (int i = 0; i < cur.column_count(); ++i) {
-				switch (cur.column_type(i)) {
-					/*
-				case SQLITE_BLOB:
-					stmt.bind(i + 1, cur.as_blob(i));
-					break;
-					*/
-				case SQLITE_FLOAT:
-					stmt.bind(i + 1, cur.as_double(i));
-					break;
-				case SQLITE_INTEGER:
-					stmt.bind(i + 1, cur.as_int(i));
-					break;
-				case SQLITE_NULL:
-					stmt.bind(i + 1);
-					break;
-				case SQLITE_TEXT:
-					stmt.bind(i + 1, cur.as_text(i));
-					break;
-				}
-			}
-			stmt.step();
-			stmt.reset();
-			cur.step();
-		}
-
-		sqlite3_exec(db, "COMMIT TRANSACTION", NULL, NULL, NULL);
-
-		}
-#endif // 0
-	} // sqlite
+} // sqlite
