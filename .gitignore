@@ -360,3 +360,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/fms_sqlite/tmb.db
+/fms_sqlite/tmp.db
