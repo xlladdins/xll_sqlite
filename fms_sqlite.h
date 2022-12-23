@@ -632,30 +632,32 @@ namespace sqlite {
 				int rows = 0;
 				stmt::iterable i(stmt);
 				while (i) {
-					++rows;
-					assert(4 == (*i).column_count());
-					assert((*i).is_int(0));
-					assert(123 == (*i).as_int(0));
-					assert((*i).is_float(1));
-					assert(1.23 == (*i).as_float(1));
-					assert((*i).is_text(2));
-					assert((*i).as_text(2) == "foo");
-					auto dt = (*i).as_datetime(3);
+					const sqlite::stmt& si = *i;
+					assert(4 == si.column_count());
+					assert(si.is_int(0));
+					assert(123 == si.as_int(0));
+					assert(si.is_float(1));
+					assert(1.23 == si.as_float(1));
+					assert(si.is_text(2));
+					assert(si.as_text(2) == "foo");
+					assert(si.is_datetime(3));
+					auto dt = si.as_datetime(3);
 					assert(SQLITE_TEXT == dt.type);
 					assert(std::string("2023-4-5") == (char*)dt.value.t);
+					++rows;
 					++i;
 				}
 				assert(1 == rows);
 
-				/*
+				
 				stmt.reset();
-				stmt.prepare("SELECT unixepoch(e) FROM a");
+				stmt.prepare("SELECT strftime('%s', e) FROM a");
 				stmt.step();
-				auto tt = stmt.as_datetime(0);
-				*/
+				//auto tt = stmt.as_int64(0);
+				
 
 				stmt.reset();
-				ret = stmt.prepare("INSERT INTO a VALUES (?, ?, ?)");
+				ret = stmt.prepare("INSERT INTO a VALUES (?, ?, ?, ?)");
 				int b = 2;
 				double c = 2.34;
 				char d[2] = { 'a', 0};
@@ -668,11 +670,11 @@ namespace sqlite {
 					stmt.bind(3, d);
 					stmt.bind(4, e);
 					stmt.step();
+
 					++b;
 					c += 0.01;
 					d[0] = ++d[0];
 					e += 86400;
-					stmt.step();
 				}
 
 				stmt.reset();
@@ -681,6 +683,26 @@ namespace sqlite {
 				assert(1 == stmt.column_count());
 				assert(4 == stmt.as_int(0));
 				assert(SQLITE_DONE == stmt.step());
+
+				{
+					sqlite::db tmp("");
+					sqlite::stmt stmt(db);
+					stmt.prepare("CREATE TABLE v (value)");
+					stmt.step();
+					stmt.reset();
+
+					stmt.prepare("INSERT INTO v VALUES(?)");
+					int i = 123;
+					stmt.bind(1, i);
+					stmt.step();
+					stmt.reset();
+
+					stmt.prepare("SELECT value FROM v");
+					stmt.step();
+
+					auto val = stmt.column_value(0);
+					val = val;
+				}
 			}
 			catch (const std::exception& ex) {
 				puts(ex.what());
@@ -721,9 +743,10 @@ namespace sqlite {
 	inline auto copy(stmt& _stmt, C& c)
 	{
 		stmt::iterable i(_stmt);
+
+		int col = _stmt.column_count();
 		while (i) {
 			const stmt& si = *i;
-			int col = si.column_count();
 			
 			// cache types
 			std::vector<int> type(col);
@@ -750,7 +773,7 @@ namespace sqlite {
 					break;
 				case SQLITE_DATETIME:
 					auto dt = si.as_datetime(j);
-					if (j.type != SQLITE_INTEGER) {
+					if (type[j] != SQLITE_INTEGER) {
 						throw std::runtime_error(__FUNCTION__ ": datetime not stored as time_t");
 					}
 					c.push_back(dt.value.i);
@@ -760,10 +783,13 @@ namespace sqlite {
 					c.push_back(si.as_blob(j));
 					break;
 					*/
+				default:
+					c.push_back(); // null
 				}
 			}
 			++i;
 		}
+		//c.resize(c.size() / col, col);
 	}
 #if 0
 	// V is a variant type with free functions 

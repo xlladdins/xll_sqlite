@@ -123,8 +123,7 @@ LPOPER WINAPI xll_sqlite_schema(HANDLEX db, const char* name)
 		stmt.prepare(sql);
 
 		result = OPER{};
-		auto bi = back_inserter(result);
-		sqlite::copy(stmt, bi);
+		copy(stmt, result);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

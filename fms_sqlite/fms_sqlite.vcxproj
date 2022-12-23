@@ -131,11 +131,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\xll_sqlite\fms_sqlite.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\sqlite-amalgamation-3390400\sqlite3.c" />
     <ClCompile Include="fms_sqlite.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\fms_sqlite.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -3,6 +3,7 @@
 #pragma warning(disable : 5103)
 #pragma warning(disable : 5105)
 #include <charconv>
+#include <iterator>
 #include <numeric>
 #include "fms_sqlite.h"
 #include "fms_parse.h"
@@ -61,12 +62,22 @@ namespace xll {
 	}
 
 	template<class X>
-	class back_inserter {
-		X& x;
+	inline void copy(sqlite::stmt& _stmt, XOPER<X>& o)
+	{
+		auto bi = std::back_inserter(o);
+		//sqlite::copy(_stmt, bi);
+		auto c = _stmt.column_count();
+		ensure(0 == o.size() % c);
+		o.resize(o.size() / c, c);
+	}
+
+	template<class X>
+	struct back_inserter : public std::back_insert_iterator<X> {
 	public:
 		back_inserter(X& x)
-			: x{ x }
+			: std::back_insert_iterator<X>{ x }
 		{ }
+		/*
 		void push_back(void)
 		{
 			x.push_back(X{});
@@ -91,6 +102,7 @@ namespace xll {
 		{
 			x.push_back(X(t.size()));
 		}
+		*/
 	};
 
 	// iterate over rows and columns of XOPER
