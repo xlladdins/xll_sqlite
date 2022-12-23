@@ -59,5 +59,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />
+    <None Include="NOTES.md" />
   </ItemGroup>
 </Project>

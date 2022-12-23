@@ -138,16 +138,22 @@ AddIn xai_sqlite_stmt_exec(
 LPOPER12 WINAPI xll_sqlite_stmt_exec(HANDLEX stmt, BOOL no_headers)
 {
 #pragma XLLEXPORT
-	static mem::OPER<XLOPER12> result;
+	static mem::XOPER<XLOPER12> result;
 
 	try {
-		result.reset();
-		result = ErrNA12;
+		//result = ErrNA12;
 		handle<sqlite::stmt> stmt_(stmt);
 		ensure(stmt_);
 
+		if (!no_headers) {
+			for (int i = 0; i < stmt_->column_count(); ++i) {
+				result.push_back(OPER(stmt_->column_name(i)));
+			}
+		}
+
+		result.reset();
 		stmt_->reset();
-		result = sqlite_exec_mem<XLOPER12>(*stmt_, no_headers);
+		//result = sqlite_exec_mem<XLOPER12>(*stmt_, no_headers);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -168,10 +174,10 @@ AddIn xai_sqlite_query(
 	.FunctionHelp("Return result of executing sql with optional binding.")
 	.HelpTopic("https://www.sqlite.org/c3ref/query.html")
 );
-LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, BOOL no_headers, const LPOPER4 pval)
+LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, BOOL /*no_headers*/, const LPOPER4 pval)
 {
 #pragma XLLEXPORT
-	static mem::OPER<XLOPER12> result;
+	static mem::XOPER<XLOPER12> result;
 
 	try {
 		result.reset();
@@ -184,7 +190,7 @@ LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, BOOL no_head
 		stmt.prepare(sql);
 		sqlite_bind(stmt, *pval);
 		
-		result = sqlite_exec_mem<XLOPER12>(stmt, no_headers);
+		//result = sqlite_exec_mem<XLOPER12>(stmt, no_headers);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -203,7 +209,7 @@ AddIn xai_sqlite_stmt_explain(
 	.FunctionHelp("Explain the query plan of a prepared statement.")
 	.HelpTopic("https://www.sqlite.org/eqp.html")
 );
-LPOPER WINAPI xll_sqlite_stmt_explain(HANDLEX stmt, BOOL no_headers)
+LPOPER WINAPI xll_sqlite_stmt_explain(HANDLEX stmt, BOOL /*no_headers*/)
 {
 #pragma XLLEXPORT
 	static OPER result;
@@ -216,7 +222,7 @@ LPOPER WINAPI xll_sqlite_stmt_explain(HANDLEX stmt, BOOL no_headers)
 		auto sql = std::string("EXPLAIN QUERY PLAN ") + stmt_->sql();
 		sqlite::stmt eqp(stmt_->db_handle());
 		eqp.prepare(sql);
-		result = sqlite_exec(eqp, no_headers);
+		//result = sqlite_exec(eqp, no_headers);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

@@ -5,6 +5,7 @@
 #include "xll_sqlite.h"
 
 using namespace xll;
+
 #if 0
 const char* common_type(const char* a, const char* b)
 {
@@ -156,26 +157,23 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* name, LPOPER pdat
 {
 #pragma XLLEXPORT
 	try {
-
-		unsigned row = 0; // first row of data
 		const OPER& data = *pdata;
+		unsigned row = 0; // first row of data
 
 		if (pcolumns->is_missing()) {
 			row = 1; // first row has column names
 		}
 
-		sqlite::table_info<XLOPER12> ti(data.columns());		
+		sqlite::table_info<XLOPER12> ti;		
 		for (unsigned j = 0; j < data.columns(); ++j) {
 			OPER namej = row == 0 ? (*pcolumns)[j] : data(0, j);
 			namej = namej ? namej : OPER("col") & OPER(j);
-			ti.name[j] = namej.to_string();
 			
-			if (ptypes->is_missing()) {
-				ti.type[j] = type_name(data(row, j));
-			}
-			else {
-				ti.type[j] = (*ptypes)[j].to_string();
-			}
+			OPER typej = ptypes->is_missing()
+				? type_name(data(row, j))
+				: (*ptypes)[j];
+			
+			ti.push_back(namej.to_string(), typej.to_string());
 		}		
 
 		handle<sqlite::db> db_(db);
@@ -186,19 +184,9 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* name, LPOPER pdat
 		const auto tname = sqlite::table_name(name);
 		ensure(SQLITE_OK == ti.create_table(*db_, tname));
 
-		std::vector<int> decl(ti.size());
-		for (unsigned j = 0; j < ti.size(); ++j) {
-			decl[j] = ::sqlite_decltype(ti.type[j].c_str());
-		}
-
-		sqlite::stmt stmt(ti.insert_values(*db_, tname));
-		for (unsigned i = row; i < data.rows(); ++i) {
-			for (unsigned j = 0; j < data.columns(); ++j) {
-				bind(stmt, j + 1, data(i, j), decl[j]);
-			}
-			stmt.step();
-			stmt.reset();
-		}
+		sqlite::stmt stmt = ti.insert_into(*db_, tname);
+		cursor/*<XLOPER12>*/ cur(data, row);
+		ti.insert_values(stmt, cur);
 
 		sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
 	}
@@ -233,6 +221,7 @@ HANDLEX WINAPI xll_sqlite_create_table_as(HANDLEX db, const char* table, LPOPER 
 		const auto dte = std::string("DROP TABLE IF EXISTS [") + table + "]";
 		FMS_SQLITE_OK(*db_, sqlite3_exec(*db_, dte.c_str(), 0, 0, 0));
 
+		// not optimal. exec stmt???
 		std::string select;
 		if (pselect->is_num()) {
 			handle<sqlite::stmt> stmt_(pselect->as_num());

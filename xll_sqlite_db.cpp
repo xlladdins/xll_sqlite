@@ -1,4 +1,5 @@
 ﻿// xll_sqlite_db.cpp - Sqlite3 bindings.
+#include <format>
 #include "xll_sqlite.h"
 
 using namespace xll;
@@ -80,4 +81,54 @@ HANDLEX WINAPI xll_sqlite_db(const char* filename, LONG flags)
 	}
 
 	return result;
+}
+
+
+AddIn xai_sqlite_schema(
+	Function(XLL_LPOPER, "xll_sqlite_schema", CATEGORY ".SCHEMA")
+	.Arguments({
+		Arg_db,
+		Arg(XLL_CSTRING4, "_name", "is the optional table name.")
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return information from sqlite_schema and table if name is specified.")
+	.HelpTopic("https://www.sqlite.org/schematab.html")
+);
+LPOPER WINAPI xll_sqlite_schema(HANDLEX db, const char* name)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		result = ErrNA;
+		handle<sqlite::db> db_(db);
+		ensure(db_);
+
+		sqlite::stmt stmt(*db_);
+
+		std::string sql;
+		if (*name) {
+			sql = std::format(
+				"SELECT * FROM sqlite_schema "
+				"WHERE name = {} "
+				"ORDER BY tbl_name, type DESC, name",
+				sqlite::quote(name, '\''));
+		}
+		else {
+			sql =
+				"SELECT * FROM sqlite_schema "
+				"ORDER BY tbl_name, type DESC, name";
+		}
+
+		stmt.prepare(sql);
+
+		result = OPER{};
+		auto bi = back_inserter(result);
+		sqlite::copy(stmt, bi);
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &result;
 }

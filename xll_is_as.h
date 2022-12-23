@@ -6,6 +6,23 @@
 
 namespace xll {
 
+	// time_t to Excel Julian date
+	inline double to_excel(time_t t)
+	{
+		return static_cast<double>(25569. + t / 86400.);
+	}
+	// Excel Julian date to time_t
+	inline time_t to_time_t(double d)
+	{
+		return static_cast<time_t>((d - 25569) * 86400);
+	}
+
+	template<class X, class T>
+	inline XOPER<X> to(const T& t)
+	{
+		return XOPER<X>{t};
+	}
+
 	template<class X>
 	inline bool is_double(const X& x)
 	{
@@ -16,6 +33,17 @@ namespace xll {
 	{
 		return x.val.num;
 	}
+	template<class X>
+	inline X to_double(double d)
+	{
+		return X{ d };
+	}
+
+	template<class X>
+	inline time_t as_datetime(const X& x)
+	{
+		return to_time_t(x.val.num);
+	}
 
 	template<class X>
 	inline bool is_text(const X& x)
@@ -25,7 +53,7 @@ namespace xll {
 	template<class X>
 	inline std::string_view as_text(const X& x)
 	{
-		if constexpr (std::is_same_v<traits<X>::xchar, char>) {
+		if constexpr (std::is_same_v<typename traits<X>::xchar, char>) {
 			return std::string_view(x.val.str + 1, x.val.str[0]);
 		}
 		else {
@@ -38,7 +66,7 @@ namespace xll {
 		return xltypeStr == type(x) and std::is_same_v<traits<X>::xchar, wchar_t>;
 	}
 	template<class X>
-	inline std::wstring_view as_text12(const X& x)
+	inline std::wstring_view as_text16(const X& x)
 	{
 		if constexpr (std::is_same_v<traits<X>::xchar, wchar_t>) {
 			return std::wstring_view(x.val.str + 1, x.val.str[0]);

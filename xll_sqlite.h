@@ -21,6 +21,7 @@ inline const auto Arg_stmt = xll::Arg(XLL_HANDLEX, "stmt", "is a handle to a sql
 inline const auto Arg_sql = xll::Arg(XLL_LPOPER, "sql", "is a SQL query to execute.");
 inline const auto Arg_bind = xll::Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
 inline const auto Arg_nh = xll::Arg(XLL_BOOL, "no_headers", "is a optional boolean value indicating not to return headers. Default is FALSE.");
+inline const auto Arg_table = xll::Arg(XLL_LPOPER4, "name", "the name of a table.");
 
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
@@ -58,144 +59,105 @@ namespace xll {
 
 		return fms::view<XCHAR>(o.val.str + 1, o.val.str[0]);
 	}
-#if 0
-	inline std::string to_chars(int i)
-	{
-		std::string str(10, 0);
-		auto [ptr, ec] = std::to_chars(str.data(), str.data() + str.length(), i);
-		if (ec == std::errc{}) {
-			str.resize(ptr - str.data());
-		}
-		else {
-			throw std::runtime_error(std::make_error_code(ec).message());
-		}
-
-		return str;
-	}
 
 	template<class X>
-	class cursor : public sqlite::cursor {
-		unsigned row;
-		const XOPER<X>& o;
-		std::vector<sqlite::cursor::type> _type;
-		std::vector<std::string> _name;
+	class back_inserter {
+		X& x;
 	public:
-		cursor(const XOPER<X>& o, unsigned row = 0)
-			: row{ row }, o{ o }, _type(o.columns()), _name(o.columns())
-		{
-			for (unsigned i = 0; i < o.columns(); ++i) {
-				if (row == 0) {
-					_type[i] = sqlite_type[o(0, i).type()];
-					_name[i] = to_chars(i);
-				}
-				else if (row == 1) {
-					_type[i] = sqlite_type[o(1, i).type()];
-					_name[i] = o(0, i).to_string();
-				}
-				else {
-					if (o(0, i) && o(0,i).is_str()) {
-						_type[i] = sqlite::type(o(0, i).val.str + 1);
-					}
-					else {
-						_type[i] = sqlite_type[o(1, i).type()];
-					}
-					_name[i] = o(1, i).to_string();
-				}
-			}
-		}
-		cursor(const cursor&) = delete;
-		cursor& operator=(const cursor&) = delete;
-		~cursor()
+		back_inserter(X& x)
+			: x{ x }
 		{ }
-		int _column_count() const override
+		void push_back(void)
 		{
-			return o.columns();
+			x.push_back(X{});
 		}
-		int _column_type(int i) const override
+		template<class T>
+		void push_back(const T& t)
 		{
-			switch (o(row, i).type()) {
-			case xltypeNum:
-				return SQLITE_FLOAT;
-			case xltypeStr:
-				return SQLITE_TEXT;
-			case xltypeInt:
-				return SQLITE_INTEGER;
-				/*
-			case xltypeBigData:
-				return SQLITE_BLOB;
-				*/
-			case xltypeNil:
-				return SQLITE_NULL;
-			default:
-				ensure(!__FUNCTION__ ": unknown type");
-			}
-
-			return SQLITE_UNKNOWN;
+			x.push_back(X{ t });
 		}
-		const char* _column_name(int /*i*/) const override
+		template<>
+		void push_back(const std::string_view& t)
 		{
-			return nullptr;
+			x.push_back(X(t.data(), (int)t.size()));
 		}
-		bool _done() const override
+		template<>
+		void push_back(const sqlite::datetime& t)
 		{
-			return row >= o.rows();
+			x.push_back(X(t.type));
 		}
-		void _step() override
+		template<>
+		void push_back(const std::basic_string_view<std::byte>& t)
 		{
-			++row;
-		}
-
-		/*
-		std::span<void*> _as_blob(int i) const override
-		{
-			auto blob = o(row, i).val.bigdata;
-			void* p = blob.h.lpData;
-
-			return std::span<void*>(p, p + blob.cbData);
-		}
-		*/
-		double _as_double(int i) const override
-		{
-			return o(row, i).as_num();
-		}
-		int _as_int(int i) const override
-		{
-			return o(row, i).as_int();
-		}
-		std::string_view _as_text(int i) const override
-		{
-			const auto& str = o(row, i).val.str;
-
-			if constexpr (std::is_same_v<traits<X>::xchar, char>) {
-				return std::string_view(str + 1, str[0]);
-			}
-			else {
-				return std::string_view{};
-			}
-		}
-		std::wstring_view _as_text16(int i) const override
-		{
-			const auto& str = o(row, i).val.str;
-
-			if constexpr (std::is_same_v<traits<X>::xchar, wchar_t>) {
-				return std::wstring_view(str + 1, str[0]);
-			}
-			else {
-				return std::wstring_view{};
-			}
+			x.push_back(X(t.size()));
 		}
 	};
-#endif // 0
-	// time_t to Excel Julian date
-	inline double to_excel(time_t t)
-	{
-		return static_cast<double>(25569. + t / 86400.);
-	}
-	// Excel Julian date to time_t
-	inline time_t to_time_t(double d)
-	{
-		return static_cast<time_t>((d - 25569) * 86400);
-	}
+
+	// iterate over rows and columns of XOPER
+	template<class X>
+	class cursor {
+		const XOPER<X>& o;
+		unsigned row;
+	public:
+		using value_type = X;
+
+		cursor(const XOPER<X>& o, unsigned row = 0)
+			: o{ o }, row{row}
+		{ }
+
+		explicit operator bool() const
+		{
+			return row < o.rows();
+		}
+
+		class row_iter {
+			X x;
+			unsigned column;
+		public:
+			row_iter(const X& x, unsigned column = 0)
+				: x{ x }, column{ column }
+			{ }
+			explicit operator bool() const
+			{
+				return column < columns(x);
+			}
+			const X& operator*() const
+			{
+				return index(x, 0, column);
+			}
+			row_iter& operator++()
+			{
+				if (column < columns(x)) {
+					++column;
+				}
+
+				return *this;
+			}
+		};
+		
+		row_iter operator*() const
+		{
+			auto c = o.val.array.columns;
+	
+			X x = {
+				.val = {.array = {
+					.lparray = o.val.array.lparray + row * c,
+					.rows = 1,
+					.columns = c} },
+				.xltype = xltypeMulti };
+
+			return row_iter(x);
+		}
+
+		cursor& operator++()
+		{
+			if (row < o.rows()) {
+				++row;
+			}
+
+			return *this;
+		}
+	};
 
 	// 1-based
 	template<class X>
@@ -216,6 +178,7 @@ namespace xll {
 		return i;
 	}
 
+	/* !!! */
 	template<class X>
 	inline void bind(sqlite3_stmt* stmt, int i, const XOPER<X>& o, int type = 0)
 	{
@@ -271,32 +234,32 @@ namespace xll {
 	}
 
 	// convert column i to OPER
-	inline OPER column(const sqlite::stmt& stmt, int i)
+	inline OPER column(const sqlite::stmt& stmt, int i, int type)
 	{
-		switch (stmt.type(i)) {
+		switch (type) {
 		case SQLITE_NULL:
 			return OPER("");
 		case SQLITE_INTEGER:
-			return OPER(stmt.column_int(i));
+			return OPER(stmt.as_int(i));
 		case SQLITE_FLOAT:
 		case SQLITE_NUMERIC:
-			return OPER(stmt.column_double(i));
+			return OPER(stmt.as_float(i));
 		case SQLITE_TEXT: {
-			auto text = stmt.column_text(i);
+			auto text = stmt.as_text(i);
 			return OPER(text.data(), static_cast<char>(text.size()));
 		}
 		case SQLITE_BOOLEAN:
-			return OPER(stmt.columns_boolean(i));
+			return OPER(stmt.as_boolean(i));
 		case SQLITE_DATETIME:
-			auto dt = stmt.column_datetime(i);
+			auto dt = stmt.as_datetime(i);
 			if (SQLITE_TEXT == dt.type) {
-				auto vt = stmt.column_text(i);
+				auto vt = stmt.as_text(i);
 				if (vt.size() == 0)
 					return OPER("");
 				fms::view v(vt.data(), (int)vt.size());
 				struct tm tm;
 				if (fms::parse_tm(v, &tm)) {
-					return OPER(to_excel(_mkgmtime(&tm)));
+					return OPER(0/*to_excel(_mkgmtime(&tm))*/);
 				}
 				else {
 					return ErrValue;
@@ -305,7 +268,7 @@ namespace xll {
 			if (SQLITE_INTEGER == dt.type) {
 				time_t t = dt.value.i;
 				if (t) {
-					return OPER(to_excel(t));
+					return 0;//!!! OPER(to_excel(t));
 				}
 			}
 			else if (SQLITE_FLOAT == dt.type) {
@@ -364,7 +327,7 @@ namespace xll {
 			}
 		}
 	}
-
+	/*
 	inline OPER sqlite_exec(sqlite::stmt& stmt, bool no_headers)
 	{
 		OPER result;
@@ -375,7 +338,7 @@ namespace xll {
 			result = to_handle<sqlite::stmt>(&stmt);
 		}
 		else if (SQLITE_ROW == ret) {
-			OPER row(1, stmt.column_count());
+			OPER row(1, stmt.as_count());
 
 			if (!no_headers) {
 				for (unsigned i = 0; i < row.columns(); ++i) {
@@ -399,7 +362,6 @@ namespace xll {
 
 		return result;
 	}
-
 	template<class X>
 	inline mem::OPER<X> sqlite_exec_mem(sqlite::stmt& stmt, bool no_headers)
 	{
@@ -436,6 +398,7 @@ namespace xll {
 
 		return result;
 	}
+	*/
 
 
 } // namespace xll

@@ -26,7 +26,8 @@ LPOPER WINAPI xll_sqlite_schema(HANDLEX db, BOOL no_headers)
 		sqlite::stmt stmt(*db_);
 		stmt.prepare("select * from sqlite_schema");
 
-		result = sqlite_exec(stmt, no_headers);
+		result = OPER{};
+		stmt.exec<OPER,OPER>(result, 0 != no_headers);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -46,7 +47,7 @@ AddIn xai_sqlite_pragma(
 	.FunctionHelp("Call 'PRAGMA pragma' or return all pramas if omitted.")
 	.HelpTopic("https://www.sqlite.org/pragma.html")
 );
-LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma, BOOL no_headers)
+LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma, BOOL /*no_headers*/)
 {
 #pragma XLLEXPORT
 	static OPER result;
@@ -62,7 +63,7 @@ LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma, BOOL no_headers)
 		sqlite::stmt stmt(*db_);
 		stmt.prepare(sql);
 
-		result = sqlite_exec(stmt, no_headers);
+		//result = sqlite_exec(stmt, no_headers);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
