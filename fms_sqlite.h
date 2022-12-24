@@ -780,8 +780,6 @@ namespace sqlite {
 				}
 				{
 					value v("string");
-					auto vv = v.as_text();
-					auto t = v.type();
 					assert(SQLITE_TEXT == v.type());
 					assert(0 == strcmp("string", (const char*)v.as_text()));
 				}
