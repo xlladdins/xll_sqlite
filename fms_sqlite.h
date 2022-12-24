@@ -713,6 +713,33 @@ namespace sqlite {
 #endif // _DEBUG
 	};
 
+	class value {
+		inline static sqlite::db db = sqlite::db("");
+		sqlite3_value* pv;
+	public:
+		value()
+			: pv{nullptr}
+		{
+			sqlite::stmt stmt(db);
+			stmt.prepare("CREATE TABLE v (value)");
+			stmt.step();
+		}
+		template<class T>
+		value(const T& t)
+		{
+			sqlite::stmt stmt(db);
+			stmt.prepare("INSERT INTO v (?)");
+			stmt.bind(1, t);
+			stmt.step();
+			stmt.reset();
+
+			stmt.prepare("SELECT value from v");
+			stmt.step();
+
+			pv = stmt.column_value(0);
+		}
+	};
+
 	inline std::string quote(const std::string_view& s, char l, char r = 0)
 	{
 		std::string t(s);

@@ -18,14 +18,12 @@ SQL data types specified in the
 The function `sqlite3_column_decltype` returns the character string used
 and `int sqlite::stmt::sqltype(int i)` returns the extended sqlite type.
 
-For any external (variant) type `X` you should define `T as_xxx(const X&)` to convert
-to the `xxx` sqlite extended type to insert `X` into sqlite. You should also define
-`X to(const T&)` to retrieve extended types from sqlite. If `X` has a constructor
-from `T` this can be defined by
-```
-    template<class T>
-    inline X to(const T& t){
-	    return X{t};
-    }
-```
-Include this before `fms_sqlite.h`.
+Getting data in and out of sqlite is just copying an iterable.
+
+A SELECT statement creates an output iterable `sqlite::stmt`.
+
+An INSERT statement creates an input iterable `sqlite::stmt`.
+
+`copy(i, o) { while (i and o) { *o = *i} }`
+
+Override `operator*` to return proxies.
