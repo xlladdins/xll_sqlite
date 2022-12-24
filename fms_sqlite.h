@@ -127,6 +127,19 @@ namespace sqlite {
 			const unsigned char* t;
 		} value; // SQLITE_FLOAT/INTEGER/TEXT
 		int type;
+
+		datetime() noexcept
+			: value{ .t = nullptr }, type{ SQLITE_UNKNOWN}
+		{ }
+		explicit datetime(double f) noexcept
+			: value{ .f = f }, type{ SQLITE_FLOAT}
+		{ }
+		explicit datetime(time_t i) noexcept
+			: value{ .i = i }, type{ SQLITE_INTEGER }
+		{ }
+		explicit datetime(const char* t) noexcept
+			: value{ .t = (const unsigned char*)t }, type{ SQLITE_TEXT }
+		{ }
 	};
 
 	class string {
@@ -204,6 +217,7 @@ namespace sqlite {
 
 	// https://www.sqlite.org/lang.html
 	class stmt {
+	protected:
 		sqlite3* pdb;
 		sqlite3_stmt* pstmt;
 	public:
@@ -214,22 +228,27 @@ namespace sqlite {
 				throw std::runtime_error(__FUNCTION__ ": database handle must not be null");
 			}
 		}
-		stmt(const stmt&) = delete;
-		stmt& operator=(const stmt&) = delete;
-		stmt(stmt&& _stmt) noexcept
+		stmt(const stmt& _stmt)
+			: stmt(_stmt.db_handle())
 		{
-			*this = std::move(_stmt);
+			const char* sql = sqlite3_expanded_sql(_stmt.pstmt);
+			if (sql and *sql) {
+				prepare(sql);
+			}
 		}
-		stmt& operator=(stmt&& _stmt) noexcept
+		stmt& operator=(const stmt& _stmt)
 		{
 			if (this != &_stmt) {
-				pdb = std::exchange(_stmt.pdb, nullptr);
-				pstmt = std::exchange(_stmt.pstmt, nullptr);
+				pdb = _stmt.db_handle();
+				const char* sql = sqlite3_expanded_sql(_stmt.pstmt);
+				if (sql and *sql) {
+					prepare(sql);
+				}
 			}
 
 			return *this;
 		}
-		~stmt()
+		virtual ~stmt()
 		{
 			if (pstmt) {
 				sqlite3_finalize(pstmt);
@@ -280,41 +299,6 @@ namespace sqlite {
 		{
 			return sqlite3_step(pstmt);
 		}
-
-		// start iteration over result rows
-		// stmt.prepare(); iterable i(stmt); while (i) { const stmt& stmt = *i; ...; ++i; }
-		class iterable {
-			sqlite3* pdb;
-			sqlite3_stmt* pstmt;
-			int ret;
-		public:
-			// assumes _stmt lifetime
-			iterable(stmt& _stmt)
-				: pdb(_stmt.db_handle()), pstmt{ _stmt }
-			{
-				ret = SQLITE_ROW;
-				operator++();
-			}
-			explicit operator bool() const noexcept
-			{
-				return SQLITE_ROW == ret;
-			}
-			const stmt& operator*() noexcept
-			{
-				return *(const stmt*)this;
-			}
-			iterable& operator++()
-			{
-				if (SQLITE_ROW == ret) {
-					ret = sqlite3_step(pstmt);
-					if (!(SQLITE_ROW == ret or SQLITE_DONE == ret)) {
-						throw std::runtime_error(sqlite3_errmsg(pdb));
-					}
-				}
-
-				return *this;
-			}
-		};
 
 		// reset a prepared statement
 		int reset()
@@ -375,6 +359,13 @@ namespace sqlite {
 		{
 			FMS_SQLITE_OK(pdb, sqlite3_bind_text16(pstmt, i, (const void*)str.data(),
 				static_cast<int>(2 * str.size()), cb));
+
+			return *this;
+		}
+
+		stmt& bind(int i, const sqlite3_value* value)
+		{
+			FMS_SQLITE_OK(pdb, sqlite3_bind_value(pstmt, i, value));
 
 			return *this;
 		}
@@ -533,14 +524,14 @@ namespace sqlite {
 		{
 			switch (column_type(i)) {
 			case SQLITE_FLOAT:
-				return datetime{ .value = {.f = as_float(i)}, .type = SQLITE_FLOAT };
+				return datetime(as_float(i));
 			case SQLITE_INTEGER:
-				return datetime{ .value = {.i = as_int64(i)}, .type = SQLITE_INTEGER };
+				return datetime(as_int64(i));
 			case SQLITE_TEXT:
-				return datetime{ .value = {.t = sqlite3_column_text(pstmt, i)}, .type = SQLITE_TEXT };
+				return datetime(as_text(i).data());
 			}
 
-			return datetime{ .value = {.t = nullptr}, .type = SQLITE_UNKNOWN };
+			return datetime{};
 		}
 
 		// internal representation
@@ -577,7 +568,8 @@ namespace sqlite {
 				stmt.reset();
 				stmt.prepare("SELECT * FROM a");
 				int rows = 0;
-				stmt::iterable i(stmt);
+				/*
+				iterable i(stmt);
 				while (i) {
 					const sqlite::stmt& si = *i;
 					assert(4 == si.column_count());
@@ -615,7 +607,7 @@ namespace sqlite {
 					stmt.bind(1, b);
 					stmt.bind(2, c);
 					stmt.bind(3, d);
-					stmt.bind(4, e);
+					stmt.bind(4, datetime(e));
 					stmt.step();
 
 					++b;
@@ -630,7 +622,7 @@ namespace sqlite {
 				assert(1 == stmt.column_count());
 				assert(4 == stmt.as_int(0));
 				assert(SQLITE_DONE == stmt.step());
-
+				*/
 			}
 			catch (const std::exception& ex) {
 				puts(ex.what());
@@ -640,6 +632,55 @@ namespace sqlite {
 		}
 #endif // _DEBUG
 	};
+	// start iteration over result rows
+	// stmt.prepare(); iterable i(stmt); while (i) { const stmt& stmt = *i; ...; ++i; }
+	class iterable : public sqlite::stmt {
+		int ret;
+	public:
+		iterable(const stmt& stmt)
+			: sqlite::stmt(stmt)
+		{
+			ret = SQLITE_ROW;
+			operator++();
+		}
+		explicit operator bool() const noexcept
+		{
+			return SQLITE_DONE != ret;
+		}
+		const stmt& operator*() const noexcept
+		{
+			return *(const stmt*)this;
+		}
+		stmt& operator*() noexcept
+		{
+			return *(stmt*)this;
+		}
+		iterable& operator++()
+		{
+			if (SQLITE_ROW == ret) {
+				ret = sqlite3_step(pstmt);
+				if (!(SQLITE_ROW == ret or SQLITE_DONE == ret)) {
+					throw std::runtime_error(sqlite3_errmsg(pdb));
+				}
+			}
+
+			return *this;
+		}
+	};
+
+	template<class Row>
+	struct output_iterable : public iterable {
+		output_iterable(const iterable& i)
+			: iterable{ i }
+		{ }
+		void operator*(const Row& row)
+		{
+			while (row) {
+				;
+			}
+		}
+	};
+
 
 	// scratch database for a single sqlite3_value
 	// https://www.sqlite.org/c3ref/value_blob.html
@@ -651,7 +692,7 @@ namespace sqlite {
 			
 			if (init) {
 				sqlite::stmt stmt(db);
-				stmt.prepare("CREATE TABLE IF NOT EXISTS v (value)");
+				stmt.prepare("CREATE TABLE IF NOT EXISTS v (value DATETIME)");
 				stmt.step();
 
 				init = false;
@@ -672,6 +713,16 @@ namespace sqlite {
 			stmt.reset();
 			stmt.prepare("INSERT INTO v VALUES (?)");
 			stmt.bind(1, t);
+			stmt.step();
+
+			rowid = sqlite3_last_insert_rowid(db());
+		}
+		value(const datetime& dt)
+			: value()
+		{
+			stmt.reset();
+			stmt.prepare("INSERT INTO v VALUES (?)");
+			stmt.bind(1, dt);
 			stmt.step();
 
 			rowid = sqlite3_last_insert_rowid(db());
@@ -713,6 +764,16 @@ namespace sqlite {
 			stmt.reset();
 			stmt.prepare("SELECT value FROM v WHERE rowid = ?");
 			stmt.bind(1, rowid);
+			stmt.step();
+
+			return stmt.as_value(0);
+		}
+		sqlite3_value* select(const char* expr) const
+		{
+			stmt.reset();
+			stmt.prepare("SELECT ? FROM v WHERE rowid = ?");
+			stmt.bind(1, expr);
+			stmt.bind(2, rowid);
 			stmt.step();
 
 			return stmt.as_value(0);
@@ -764,6 +825,25 @@ namespace sqlite {
 
 			return stmt.as_value(0);
 		}
+		sqlite3_value* strftime(const char* format) const
+		{
+			stmt.reset();
+			stmt.prepare("SELECT strftime(value, ?) FROM v WHERE rowid = ?");
+			stmt.bind(1, format);
+			stmt.bind(2, rowid);
+			auto sql = stmt.expanded_sql();
+			stmt.step();
+
+			return stmt.as_value(0);
+		}
+		double julianday() const
+		{
+			return sqlite3_value_double(strftime("%J"));
+		}
+		sqlite3_int64 unixepoch() const
+		{
+			return sqlite3_value_int64(strftime("%s"));
+		}
 #ifdef _DEBUG
 		static int test()
 		{
@@ -782,6 +862,15 @@ namespace sqlite {
 					value v("string");
 					assert(SQLITE_TEXT == v.type());
 					assert(0 == strcmp("string", (const char*)v.as_text()));
+				}
+				{
+					value v(datetime("2023-4-5"));
+					int tt = v.type();
+
+					auto d = v.julianday();
+					value dv(v.select("julianday(datetime)"));
+					assert(dv.as_double() == d);
+					auto t = v.unixepoch();	
 				}
 			}
 			catch (const std::exception& ex) {
@@ -816,7 +905,8 @@ namespace sqlite {
 	{
 		return quote(v, '\'');
 	}
-
+#if 0
+	/*
 	template<class C>
 	//	requires requires (C c) {
 	//	c.push_back(); }
@@ -871,6 +961,7 @@ namespace sqlite {
 		}
 		//c.resize(c.size() / col, col);
 	}
+#endif // 0
 #if 0
 	// V is a variant type with free functions 
 	// `bool is_xxx(const V&)` and `xxx as_xxx(const V&)`
