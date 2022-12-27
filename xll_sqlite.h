@@ -86,30 +86,30 @@ namespace xll {
 			return XOPER<X>(v.as<double>());
 		case SQLITE_TEXT:
 			auto str = v.as<std::string_view>();
-			return XOPER<X>(str.date(), (int)str.size());
+			return XOPER<X>(str.data(), (int)str.size());
 			//case SQLITE_BLOB:
 		case SQLITE_BOOLEAN:
 			return XOPER<X>(v.as<bool>());
 		case SQLITE_DATETIME:
-			auto dt = stmt.as_datetime(i);
+			auto dt = v.as<sqlite::datetime>();
 			if (SQLITE_TEXT == dt.type) {
-				fms::view v(dt.value.t);
-				if (v.size() == 0) {
+				fms::view vdt(dt.value.t);
+				if (vdt.len == 0) {
 					return XOPER<X>("");
 				}
 				struct tm tm;
-				if (fms::parse_tm(v, &tm)) {
+				if (fms::parse_tm(vdt, &tm)) {
 					return XOPER<X>(to_excel(_mkgmtime(&tm)));
 				}
 				else {
-					return ErrValue;
+					return XErrValue<X>;
 				}
 			}
 			else if (SQLITE_INTEGER == dt.type) {
 				return XOPER<X>(to_excel(dt.value.i));
 			}
 			else if (SQLITE_FLOAT == dt.type) {
-				return XOPER<X>(to_excel(dt.value.f); // Julian
+				return XOPER<X>(to_excel(dt.value.f));
 			}
 		case SQLITE_NULL:
 			return XOPER<X>{};
