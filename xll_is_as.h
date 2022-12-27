@@ -11,6 +11,11 @@ namespace xll {
 	{
 		return static_cast<double>(25569. + t / 86400.);
 	}
+	// Gregorian to Excel
+	inline double to_excel(double d)
+	{
+		return (d - 2440587.5);
+	}
 	// Excel Julian date to time_t
 	inline time_t to_time_t(double d)
 	{

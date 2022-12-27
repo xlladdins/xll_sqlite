@@ -15,16 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="fms_sqlite.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="xll_sqlite.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="xll_text.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="fms_parse.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="win_mem_view.h">
@@ -53,7 +47,7 @@
     <ClCompile Include="xll_sqlite_stmt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sqlite-amalgamation-3390400\sqlite3.c">
+    <ClCompile Include="fms_sqlite\sqlite-amalgamation-3390400\sqlite3.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

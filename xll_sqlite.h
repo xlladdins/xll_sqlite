@@ -5,8 +5,7 @@
 #include <charconv>
 #include <iterator>
 #include <numeric>
-#include "fms_sqlite.h"
-#include "fms_parse.h"
+#include "fms_sqlite/fms_sqlite.h"
 #include "xll_mem_oper.h"
 #include "xll/xll/splitpath.h"
 #include "xll/xll/xll.h"
@@ -48,6 +47,22 @@ namespace xll {
 	};
 #undef XLNAME
 
+	// time_t to Excel Julian date
+	inline double to_excel(time_t t)
+	{
+		return static_cast<double>(25569. + t / 86400.);
+	}
+	// Gregorian to Excel
+	inline double to_excel(double d)
+	{
+		return (d - 2440587.5);
+	}
+	// Excel Julian date to time_t
+	inline time_t to_time_t(double d)
+	{
+		return static_cast<time_t>((d - 25569) * 86400);
+	}
+
 	inline auto view(const XLOPER& o)
 	{
 		ensure(xltypeStr == type(o));
@@ -62,6 +77,48 @@ namespace xll {
 	}
 
 	template<class X>
+	inline XOPER<X> to_oper(const sqlite::value& v)
+	{
+		switch (v.type()) {
+		case SQLITE_INTEGER:
+			return XOPER<X>(v.as<int>());
+		case SQLITE_FLOAT:
+			return XOPER<X>(v.as<double>());
+		case SQLITE_TEXT:
+			auto str = v.as<std::string_view>();
+			return XOPER<X>(str.date(), (int)str.size());
+			//case SQLITE_BLOB:
+		case SQLITE_BOOLEAN:
+			return XOPER<X>(v.as<bool>());
+		case SQLITE_DATETIME:
+			auto dt = stmt.as_datetime(i);
+			if (SQLITE_TEXT == dt.type) {
+				fms::view v(dt.value.t);
+				if (v.size() == 0) {
+					return XOPER<X>("");
+				}
+				struct tm tm;
+				if (fms::parse_tm(v, &tm)) {
+					return XOPER<X>(to_excel(_mkgmtime(&tm)));
+				}
+				else {
+					return ErrValue;
+				}
+			}
+			else if (SQLITE_INTEGER == dt.type) {
+				return XOPER<X>(to_excel(dt.value.i));
+			}
+			else if (SQLITE_FLOAT == dt.type) {
+				return XOPER<X>(to_excel(dt.value.f); // Julian
+			}
+		case SQLITE_NULL:
+			return XOPER<X>{};
+		default: 
+			return XErrNA<X>;
+		}
+	}
+
+	template<class X>
 	inline void copy(sqlite::stmt& _stmt, XOPER<X>& o)
 	{
 		auto bi = std::back_inserter(o);
@@ -71,49 +128,15 @@ namespace xll {
 		o.resize(o.size() / c, c);
 	}
 
-	template<class X>
-	struct back_inserter : public std::back_insert_iterator<X> {
-	public:
-		back_inserter(X& x)
-			: std::back_insert_iterator<X>{ x }
-		{ }
-		/*
-		void push_back(void)
-		{
-			x.push_back(X{});
-		}
-		template<class T>
-		void push_back(const T& t)
-		{
-			x.push_back(X{ t });
-		}
-		template<>
-		void push_back(const std::string_view& t)
-		{
-			x.push_back(X(t.data(), (int)t.size()));
-		}
-		template<>
-		void push_back(const sqlite::datetime& t)
-		{
-			x.push_back(X(t.type));
-		}
-		template<>
-		void push_back(const std::basic_string_view<std::byte>& t)
-		{
-			x.push_back(X(t.size()));
-		}
-		*/
-	};
-
 	// iterate over rows and columns of XOPER
 	template<class X>
-	class cursor {
+	class iterable {
 		const XOPER<X>& o;
 		unsigned row;
 	public:
 		using value_type = X;
 
-		cursor(const XOPER<X>& o, unsigned row = 0)
+		iterable(const XOPER<X>& o, unsigned row = 0)
 			: o{ o }, row{row}
 		{ }
 
@@ -122,11 +145,11 @@ namespace xll {
 			return row < o.rows();
 		}
 
-		class row_iter {
+		class iterator {
 			X x;
 			unsigned column;
 		public:
-			row_iter(const X& x, unsigned column = 0)
+			iterator(const X& x, unsigned column = 0)
 				: x{ x }, column{ column }
 			{ }
 			explicit operator bool() const
@@ -137,7 +160,7 @@ namespace xll {
 			{
 				return index(x, 0, column);
 			}
-			row_iter& operator++()
+			iterator& operator++()
 			{
 				if (column < columns(x)) {
 					++column;
@@ -147,7 +170,7 @@ namespace xll {
 			}
 		};
 		
-		row_iter operator*() const
+		iterator operator*() const
 		{
 			auto c = o.val.array.columns;
 	
@@ -158,10 +181,10 @@ namespace xll {
 					.columns = c} },
 				.xltype = xltypeMulti };
 
-			return row_iter(x);
+			return iterator(x);
 		}
 
-		cursor& operator++()
+		iterable& operator++()
 		{
 			if (row < o.rows()) {
 				++row;
@@ -243,58 +266,6 @@ namespace xll {
 		}
 
 		return sqlite_decltype[o.type()];
-	}
-
-	// convert column i to OPER
-	inline OPER column(const sqlite::stmt& stmt, int i, int type)
-	{
-		switch (type) {
-		case SQLITE_NULL:
-			return OPER("");
-		case SQLITE_INTEGER:
-			return OPER(stmt.as_int(i));
-		case SQLITE_FLOAT:
-		case SQLITE_NUMERIC:
-			return OPER(stmt.as_float(i));
-		case SQLITE_TEXT: {
-			auto text = stmt.as_text(i);
-			return OPER(text.data(), static_cast<char>(text.size()));
-		}
-		case SQLITE_BOOLEAN:
-			return OPER(stmt.as_boolean(i));
-		case SQLITE_DATETIME:
-			auto dt = stmt.as_datetime(i);
-			if (SQLITE_TEXT == dt.type) {
-				auto vt = stmt.as_text(i);
-				if (vt.size() == 0)
-					return OPER("");
-				fms::view v(vt.data(), (int)vt.size());
-				struct tm tm;
-				if (fms::parse_tm(v, &tm)) {
-					return OPER(0/*to_excel(_mkgmtime(&tm))*/);
-				}
-				else {
-					return ErrValue;
-				}
-			}
-			if (SQLITE_INTEGER == dt.type) {
-				time_t t = dt.value.i;
-				if (t) {
-					return 0;//!!! OPER(to_excel(t));
-				}
-			}
-			else if (SQLITE_FLOAT == dt.type) {
-				double d = dt.value.f;
-				return OPER(d - 2440587.5); // Julian
-			}
-			else {
-				return ErrValue; // can't happen
-			}
-		//case SQLITE_NUMERIC: 
-		// case SQLITE_BLOB:
-		}
-
-		return ErrValue;
 	}
 
 	inline void sqlite_bind(sqlite::stmt& stmt, const OPER4& val, sqlite3_destructor_type del = SQLITE_TRANSIENT)
