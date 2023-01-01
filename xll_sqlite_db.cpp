@@ -83,7 +83,6 @@ HANDLEX WINAPI xll_sqlite_db(const char* filename, LONG flags)
 	return result;
 }
 
-
 AddIn xai_sqlite_schema(
 	Function(XLL_LPOPER, "xll_sqlite_schema", CATEGORY ".SCHEMA")
 	.Arguments({
@@ -106,28 +105,90 @@ LPOPER WINAPI xll_sqlite_schema(HANDLEX db, const char* name)
 
 		sqlite::stmt stmt(*db_);
 
-		std::string sql;
-		if (*name) {
-			sql = std::format(
-				"SELECT * FROM sqlite_schema "
-				"WHERE name = {} "
-				"ORDER BY tbl_name, type DESC, name",
-				sqlite::quote(name, '\''));
-		}
-		else {
-			sql =
-				"SELECT * FROM sqlite_schema "
-				"ORDER BY tbl_name, type DESC, name";
-		}
+		auto sql = std::string("SELECT * FROM sqlite_schema ")
+			+ (*name ? std::string("WHERE name = ") + sqlite::quote(name, '\'') : " ")
+			+ "ORDER BY tbl_name, type DESC, name";
 
 		stmt.prepare(sql);
 
 		result = OPER{};
-		//copy(stmt, result);
+		xll::map(stmt, result);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
 	}
 
 	return &result;
+}
+
+AddIn xai_sqlite_pragma(
+	Function(XLL_LPOPER, "xll_sqlite_pragma", CATEGORY ".PRAGMA")
+	.Arguments({
+		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
+		Arg(XLL_CSTRING4, "_pragma", "is an optional pragma name."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Call 'PRAGMA pragma' or return all pragmas if omitted.")
+	.HelpTopic("https://www.sqlite.org/pragma.html")
+);
+LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		result = ErrNA;
+		handle<sqlite::db> db_(db);
+		ensure(db_);
+
+		auto sql = std::string("PRAGMA ")
+			+ (*pragma ? pragma : "pragma_list");
+
+		sqlite::stmt stmt(*db_);
+		stmt.prepare(sql);
+
+		result = OPER{};
+		xll::map(stmt, result);
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &result;
+}
+
+AddIn xai_sqlite_table_list(
+	Function(XLL_LPOPER, "xll_sqlite_table_list", CATEGORY ".TABLE_LIST")
+	.Arguments({
+		Arg_db,
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Call PRAGMA table_list.")
+	.HelpTopic("https://www.sqlite.org/pragma.html#pragma_table_list")
+);
+LPOPER WINAPI xll_sqlite_table_list(HANDLEX db)
+{
+#pragma XLLEXPORT
+
+	return xll_sqlite_pragma(db, "table_list");
+}
+
+AddIn xai_sqlite_table_info(
+	Function(XLL_LPOPER, "xll_sqlite_table_info", CATEGORY ".TABLE_INFO")
+	.Arguments({
+		Arg_db,
+		Arg(XLL_CSTRING4, "name", "is the name of the table."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Call PRAGMA table_info(table).")
+	.HelpTopic("https://www.sqlite.org/pragma.html#pragma_table_info")
+);
+LPOPER WINAPI xll_sqlite_table_info(HANDLEX db, const char* table)
+{
+#pragma XLLEXPORT
+	handle<sqlite::db> db_(db);
+
+	auto pragma = std::string("table_info(") + sqlite::table_name(table) + ")";
+
+	return xll_sqlite_pragma(db, pragma.c_str());
 }

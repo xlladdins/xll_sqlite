@@ -2,6 +2,7 @@
 #pragma once
 #pragma warning(disable : 5103)
 #pragma warning(disable : 5105)
+#include <algorithm>
 #include <charconv>
 #include <iterator>
 #include <numeric>
@@ -77,21 +78,22 @@ namespace xll {
 	}
 
 	template<class X>
-	inline XOPER<X> to_oper(const sqlite::value& v)
+	inline auto as_oper(const sqlite::value& v)
 	{
 		switch (v.type()) {
 		case SQLITE_INTEGER:
-			return XOPER<X>(v.as<int>());
+			return XOPER<X>(v.as_int());
 		case SQLITE_FLOAT:
-			return XOPER<X>(v.as<double>());
-		case SQLITE_TEXT:
-			auto str = v.as<std::string_view>();
+			return XOPER<X>(v.as_float());
+		case SQLITE_TEXT: {
+			auto str = v.as_text();
 			return XOPER<X>(str.data(), (int)str.size());
+		}
 			//case SQLITE_BLOB:
 		case SQLITE_BOOLEAN:
-			return XOPER<X>(v.as<bool>());
-		case SQLITE_DATETIME:
-			auto dt = v.as<sqlite::datetime>();
+			return XOPER<X>(v.as_boolean());
+		case SQLITE_DATETIME: {
+			auto dt = v.as_datetime();
 			if (SQLITE_TEXT == dt.type) {
 				fms::view vdt(dt.value.t);
 				if (vdt.len == 0) {
@@ -102,7 +104,7 @@ namespace xll {
 					return XOPER<X>(to_excel(_mkgmtime(&tm)));
 				}
 				else {
-					return XErrValue<X>;
+					return XOPER<X>(XOPER<X>::Err::NA);
 				}
 			}
 			else if (SQLITE_INTEGER == dt.type) {
@@ -111,23 +113,30 @@ namespace xll {
 			else if (SQLITE_FLOAT == dt.type) {
 				return XOPER<X>(to_excel(dt.value.f));
 			}
+			else {
+				return XOPER<X>(XOPER<X>::Err::NA);
+			}
+			break;
+		}
 		case SQLITE_NULL:
-			return XOPER<X>{};
+			return XOPER<X>("");
 		default: 
-			return XErrNA<X>;
+			return XOPER<X>(XOPER<X>::Err::NA);
 		}
 	}
 
-	template<class X>
-	inline void copy(sqlite::stmt& _stmt, XOPER<X>& o)
+	template<class O>
+	inline auto map(sqlite::stmt& stmt, O& o)
 	{
-		auto bi = std::back_inserter(o);
-		//sqlite::copy(_stmt, bi);
-		auto c = _stmt.column_count();
+		using X = typename O::value_type;
+		sqlite::map(stmt, std::back_inserter(o), as_oper<X>);
+		
+		auto c = stmt.column_count();
 		ensure(0 == o.size() % c);
 		o.resize(o.size() / c, c);
 	}
 
+/*
 	// iterate over rows and columns of XOPER
 	template<class X>
 	class iterable {
@@ -193,7 +202,7 @@ namespace xll {
 			return *this;
 		}
 	};
-
+*/
 	// 1-based
 	template<class X>
 	inline int bind_parameter_index(sqlite3_stmt* stmt, const XOPER<X>& o)

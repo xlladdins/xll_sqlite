@@ -32,7 +32,7 @@ namespace xll::mem {
 	public:
 		using X::val;
 		using X::xltype;
-		using value_type = typename XOPER<X>;
+		using value_type = typename X;
 		using xrw = typename traits<X>::xrw;
 		using xcol = typename traits<X>::xcol;
 		using xchar = typename traits<X>::xchar;
@@ -47,14 +47,14 @@ namespace xll::mem {
 		XOPER()
 			: X{.xltype = xltypeNil}
 		{ }
-		XOPER(const XOPER&) = delete;
-		XOPER(XOPER&& o) noexcept
+		//XOPER(const XOPER&) = delete;
+		XOPER(const XOPER& o) noexcept
 		{
 			xltype = o.xltype;
 			val = o.val;
 		}
-		XOPER& operator=(const XOPER&) = delete;
-		XOPER& operator=(XOPER&& o) noexcept
+		//XOPER& operator=(const XOPER&) = delete;
+		XOPER& operator=(const XOPER& o) noexcept
 		{
 			if (this != &o) {
 				xltype = o.xltype;
@@ -87,8 +87,8 @@ namespace xll::mem {
 		{
 			return rows() * columns();
 		}
-
-		XOPER& reshape(xrw r, xcol c)
+		// reshape
+		XOPER& resize(xrw r, xcol c)
 		{
 			if (xltype == xltypeMulti) {
 				ensure(r * c == size());

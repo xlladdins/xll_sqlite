@@ -1,7 +1,6 @@
 // xll_sqlite_table.cpp
 #pragma warning(disable : 5103)
 #pragma warning(disable : 5105)
-#include "xll_is_as.h"
 #include "xll_sqlite.h"
 
 using namespace xll;
@@ -185,8 +184,8 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* name, LPOPER pdat
 		ensure(SQLITE_OK == ti.create_table(*db_, tname));
 
 		sqlite::stmt stmt = ti.insert_into(*db_, tname);
-		cursor/*<XLOPER12>*/ cur(data, row);
-		ti.insert_values(stmt, cur);
+		//cursor/*<XLOPER12>*/ cur(data, row);
+		//ti.insert_values(stmt, cur);
 
 		sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
 	}
