@@ -47,61 +47,27 @@ const char* common_type(const char* a, const char* b)
 
 	return a;
 }
-
-const char* guess_type(const OPER& o)
-{
-	const char* type = sqlite_name[o.type()];
-	if (xltypeStr == o.type()) {
-		tm tm;
-		fms::view<wchar_t> v(o.val.str + 1, o.val.str[0]);
-		if (fms::parse_tm(v, &tm)) {
-			return "DATETIME";
-		}
-	}
-
-	return type;
-}
-
-const char* guess_type(const OPER& o, int col, int rows)
-{
-	const char* type = guess_type(o(0, col));
-
-	for (int i = 1; i < rows; ++i) {
-		const char* typei = sqlite_name[o(i, col).type()];
-		if (0 != strcmp(type, typei)) {
-			type = common_type(type, typei);
-		}
-	}
-
-	return type;
-}
+#endif // 9
 
 AddIn xai_sqlite_types(
 	Function(XLL_LPOPER, "xll_sqlite_types", CATEGORY ".TYPES")
 	.Arguments({
 		Arg(XLL_LPOPER, "range", "is a range."),
-		Arg(XLL_USHORT, "_rows", "is an optional number of rows to scan. Default is all.")
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Guess sqlite types of columns.")
 );
-LPOPER WINAPI xll_sqlite_types(const LPOPER po, unsigned short rows)
+LPOPER WINAPI xll_sqlite_types(const LPOPER po)
 {
 #pragma XLLEXPORT
 	static OPER o;
 
-	if (rows == 0) {
-		rows = (unsigned short)po->rows();
-	}
-
-	o.resize(1, po->size());
-	for (unsigned j = 0; j < o.columns(); ++j) {
-		o[j] = guess_type(o, j, rows);
-	}
+	int type = guess_sqltype(*po);
+	o = sqlite_name(type);
 
 	return &o;
 }
-
+#if 0
 AddIn xai_sqlite_insert_table(
 	Function(XLL_HANDLEX, "xll_sqlite_insert_table", CATEGORY ".INSERT_TABLE")
 	.Arguments({
@@ -152,42 +118,69 @@ AddIn xai_sqlite_create_table(
 	.FunctionHelp("Create a sqlite table in a database.")
 	.HelpTopic("https://www.sqlite.org/lang_createtable.html")
 );
-HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* name, LPOPER pdata, LPOPER pcolumns, LPOPER ptypes)
+HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pdata, LPOPER pcolumns, LPOPER ptypes)
 {
 #pragma XLLEXPORT
 	try {
-		const OPER& data = *pdata;
-		unsigned row = 0; // first row of data
-
-		if (pcolumns->is_missing()) {
-			row = 1; // first row has column names
+		ensure(!pdata->is_missing());
+		if (!pcolumns->is_missing()) {
+			ensure(pdata->columns() == pcolumns->size());
 		}
-
-		sqlite::table_info<XLOPER12> ti;		
-		for (unsigned j = 0; j < data.columns(); ++j) {
-			OPER namej = row == 0 ? (*pcolumns)[j] : data(0, j);
-			namej = namej ? namej : OPER("col") & OPER(j);
-			
-			OPER typej = ptypes->is_missing()
-				? type_name(data(row, j))
-				: (*ptypes)[j];
-			
-			ti.push_back(namej.to_string(), typej.to_string());
-		}		
+		if (!ptypes->is_missing()) {
+			ensure(pdata->columns() == ptypes->size());
+		}
 
 		handle<sqlite::db> db_(db);
 		ensure(db_);
 
-		sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
+		const OPER& data = *pdata;
+		OPER column(1, data.columns());
+		OPER type(1, data.columns());
+		unsigned row = 0; // first row of data
 
-		const auto tname = sqlite::table_name(name);
-		ensure(SQLITE_OK == ti.create_table(*db_, tname));
+		if (pcolumns->is_missing()) {
+			row = 1; // first row has column names
+			for (unsigned j = 0; j < data.columns(); ++j) {
+				column[j] = data(0, j);
+			}
+		}
+		else {
+			for (unsigned j = 0; j < data.columns(); ++j) {
+				column[j] = pcolumns->operator[](j);
+			}
+		}
 
-		sqlite::stmt stmt = ti.insert_into(*db_, tname);
-		//cursor/*<XLOPER12>*/ cur(data, row);
-		//ti.insert_values(stmt, cur);
+		if (ptypes->is_missing()) {
+			row = 1; // first row has column names
+			for (unsigned j = 0; j < data.columns(); ++j) {
+				type[j] = type_name(data(row, j));
+			}
+		}
+		else {
+			for (unsigned j = 0; j < data.columns(); ++j) {
+				type[j] = ptypes->operator[](j);
+			}
+		}
 
-		sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
+		OPER ct = OPER("CREATE TABLE [") & OPER(table) & OPER("] (");
+		const char* comma = "";
+		for (unsigned j = 0; j < data.columns(); ++j) {
+			ct &= comma;
+			ct &= column[j];
+			ct &= " ";
+			ct &= type[j];
+			comma = ", ";
+		}
+		ct &= ")";
+
+		sqlite::stmt stmt(*db_);
+		stmt.exec(ct.to_string());
+
+		//sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
+
+		//xll::cursor
+
+		//sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

@@ -52,7 +52,12 @@ LPOPER WINAPI xll_sqlite_stmt_sql(HANDLEX stmt, BOOL expanded)
 		handle<sqlite::stmt> stmt_(stmt);
 		ensure(stmt_);
 
-		result = expanded ? stmt_->expanded_sql() : stmt_->sql();
+		if (expanded) {
+			result = stmt_->expanded_sql();
+		}
+		else {
+			result = stmt_->sql();
+		}
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -163,13 +168,14 @@ LPOPER WINAPI xll_sqlite_stmt_column_name(HANDLEX stmt, LPOPER pi)
 		handle<sqlite::stmt> stmt_(stmt);
 		ensure(stmt_);
 
-		sqlite::iterator it(*stmt_);
 		if (pi->is_missing()) {
+			sqlite::iterator it(*stmt_);
 			result = OPER{};
-			map(it, result, [](const sqlite::value& v) { return OPER(v.name()); });
+			sqlite::map(it, std::back_inserter(result), 
+				[](const sqlite::value& v) { return OPER(v.name()); });
 		}
 		else {
-			result = it[pi->as_int()].name();
+			result = (*stmt_)[pi->as_int()].name();
 		}
 	}
 	catch (const std::exception& ex) {
@@ -199,13 +205,14 @@ LPOPER WINAPI xll_sqlite_stmt_column_type(HANDLEX stmt, LPOPER pi)
 		handle<sqlite::stmt> stmt_(stmt);
 		ensure(stmt_);
 
-		sqlite::stmt::iterator it(*stmt_);
 		if (pi->is_missing()) {
+			sqlite::iterator it(*stmt_);
 			result = OPER{};
-			map(it, result, [](const sqlite::value& v) { return OPER(v.type()); });
+			sqlite::map(it, std::back_inserter(result), 
+				[](const sqlite::value& v) { return OPER(v.type()); });
 		}
 		else {
-			result = it[pi->as_int()].type();
+			result = (*stmt_)[pi->as_int()].type();
 		}
 	}
 	catch (const std::exception& ex) {
@@ -235,13 +242,14 @@ LPOPER WINAPI xll_sqlite_stmt_column_sqltype(HANDLEX stmt, LPOPER pi)
 		handle<sqlite::stmt> stmt_(stmt);
 		ensure(stmt_);
 
-		sqlite::stmt::iterator it(*stmt_);
 		if (pi->is_missing()) {
+			sqlite::iterator it(*stmt_);
 			result = OPER{};
-			map(it, result, [](const sqlite::value& v) { return OPER(v.column_decltype()); });
+			sqlite::map(it, std::back_inserter(result), 
+				[](const sqlite::value& v) { return OPER(v.column_decltype()); });
 		}
 		else {
-			result = it[pi->as_int()].column_decltype();
+			result = (*stmt_)[pi->as_int()].column_decltype();
 		}
 	}
 	catch (const std::exception& ex) {
@@ -336,7 +344,7 @@ LPOPER12 WINAPI xll_sqlite_stmt_exec(HANDLEX stmt)
 
 		result.reset();
 		stmt_->reset();
-		copy<XLOPER12>(*stmt_, result);
+		xll::map(*stmt_, result);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -372,7 +380,7 @@ LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, const LPOPER
 		sqlite_bind(stmt, *pval);
 		
 		result.reset();
-		copy<XLOPER12>(stmt, result);
+		xll::map(stmt, result);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -405,7 +413,7 @@ LPOPER WINAPI xll_sqlite_stmt_explain(HANDLEX stmt)
 		eqp.prepare(sql);
 
 		result = OPER{};
-		copy<XLOPER12>(eqp, result);
+		xll::map(eqp, result);
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

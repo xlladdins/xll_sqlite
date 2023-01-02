@@ -35,19 +35,6 @@ X(xltypeNil,     SQLITE_NULL,    "NULL")    \
 
 namespace xll {
 
-	// xltype to sqlite basic type
-#define XLTYPE(a, b, c) {a, b},
-	inline std::map<int, int> sqlite_type = {
-		XLL_SQLITE_TYPE(XLTYPE)
-	};
-#undef XLTYPE
-
-#define XLNAME(a, b, c) {a, c},
-	inline std::map<int, const char*> sqlite_decltype = {
-		XLL_SQLITE_TYPE(XLNAME)
-	};
-#undef XLNAME
-
 	// time_t to Excel Julian date
 	inline double to_excel(time_t t)
 	{
@@ -77,6 +64,95 @@ namespace xll {
 		return fms::view<XCHAR>(o.val.str + 1, o.val.str[0]);
 	}
 
+	// guess at type
+	template<class X>
+	inline int sqltype(const X& x)
+	{
+		if (xll::type(x) == xltypeStr) {
+			auto vdt = view(x);
+			if (vdt.len == 0) {
+				return SQLITE_NULL;
+			}
+			struct tm tm;
+			if (fms::parse_tm(vdt, &tm)) {
+				return SQLITE_DATETIME;
+			}
+			else {
+				return SQLITE_TEXT;
+			}
+		}
+
+#define TO_SQLTYPE(a,b,c) if (type == a) { return b; }
+//		XLL_SQLITE_TYPE(TO_SQLTYPE)
+#undef TO_SQLTYPE
+
+		return SQLITE_NULL; // e.g., xltypeErr
+	}
+
+	// heuristic to detect Excel date type
+	// if number in [1970, 3000] then possible date
+	// bool < int < float < text
+	template<class X>
+	inline int guess_sqltype(const X& xs)
+	{
+		static const double _1970 = 25569.00;
+		static const double _3000 = 401769.00;
+		static auto is_date = [](const X& x) { // possible date
+			return sqltype(x) == SQLITE_FLOAT and _1970 <= x.val.num and x.val.num <= _3000;
+		};
+
+		if (!xs) return xltypeNil;
+		
+		const auto x0 = index(xs, 0);
+		int type = sqltype(x0);
+		bool date = is_date(x0);
+		bool notdate = !date;
+
+		for (const auto& x : xs) {
+			int ti = sqltype(x);
+			
+			if (ti == SQLITE_NULL) {
+				continue;
+			}
+			
+			if (ti != type) {
+				if (type == SQLITE_BOOLEAN) {
+					type = ti;
+					notdate |= true;
+				}
+				if (type == SQLITE_INTEGER) {
+					type = ti;
+					notdate |= true;
+				}
+				if (ti == SQLITE_FLOAT) {
+					type = ti;
+					if (is_date(x)) {
+						date |= true;
+					}
+				}
+				if (ti == SQLITE_DATETIME) {
+					type = ti;
+					date |= true;
+				}
+			}
+		}
+
+		return (date or !notdate) ? SQLITE_DATETIME : type;
+	}
+
+	// xltype to sqlite basic type
+#define XLTYPE(a, b, c) {a, b},
+	inline std::map<int, int> sqlite_type = {
+		XLL_SQLITE_TYPE(XLTYPE)
+	};
+#undef XLTYPE
+
+#define XLNAME(a, b, c) {a, c},
+	inline std::map<int, const char*> sqlite_decltype = {
+		XLL_SQLITE_TYPE(XLNAME)
+	};
+#undef XLNAME
+
 	template<class X>
 	inline auto as_oper(const sqlite::value& v)
 	{
@@ -104,7 +180,7 @@ namespace xll {
 					return XOPER<X>(to_excel(_mkgmtime(&tm)));
 				}
 				else {
-					return XOPER<X>(XOPER<X>::Err::NA);
+					return XOPER<X>(to_excel(dt.value.f));
 				}
 			}
 			else if (SQLITE_INTEGER == dt.type) {
@@ -133,10 +209,21 @@ namespace xll {
 		
 		auto c = stmt.column_count();
 		ensure(0 == o.size() % c);
+
 		o.resize(o.size() / c, c);
 	}
+	template<class O>
+	inline auto map(sqlite::iterator& i, O& o)
+	{
+		using X = typename O::value_type;
+		sqlite::map(i, std::back_inserter(o), as_oper<X>);
+	}
 
-/*
+	template<class I>
+	inline auto map(I& i, sqlite::cursor& c)
+	{
+	}
+
 	// iterate over rows and columns of XOPER
 	template<class X>
 	class iterable {
@@ -146,7 +233,7 @@ namespace xll {
 		using value_type = X;
 
 		iterable(const XOPER<X>& o, unsigned row = 0)
-			: o{ o }, row{row}
+			: o{ o }, row{ row }
 		{ }
 
 		explicit operator bool() const
@@ -178,11 +265,11 @@ namespace xll {
 				return *this;
 			}
 		};
-		
+
 		iterator operator*() const
 		{
 			auto c = o.val.array.columns;
-	
+
 			X x = {
 				.val = {.array = {
 					.lparray = o.val.array.lparray + row * c,
@@ -202,7 +289,7 @@ namespace xll {
 			return *this;
 		}
 	};
-*/
+	
 	// 1-based
 	template<class X>
 	inline int bind_parameter_index(sqlite3_stmt* stmt, const XOPER<X>& o)
