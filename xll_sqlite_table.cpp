@@ -63,7 +63,7 @@ LPOPER WINAPI xll_sqlite_types(const LPOPER po)
 	static OPER o;
 
 	int type = guess_sqltype(*po);
-	o = sqlite_name(type);
+	o = sqlite_name(sqlite_type[type]);
 
 	return &o;
 }
