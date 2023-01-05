@@ -43,7 +43,7 @@ namespace xll {
 #undef XL_SQL_TYPE
 	};
 
-	// Excel to extended SQLite type.
+	// Excel type to extended SQLite type.
 	inline constexpr int sqltype(int xltype)
 	{
 		for (auto [x, s] : xl_sql_type) {
@@ -92,6 +92,19 @@ namespace xll {
 		ensure(xltypeStr == type(o));
 
 		return fms::view<XCHAR>(o.val.str + 1, o.val.str[0]);
+	}
+
+	inline auto string_view(const XLOPER& o)
+	{
+		ensure(xltypeStr == type(o));
+
+		return std::string_view(o.val.str + 1, o.val.str[0]);
+	}
+	inline auto string_view(const XLOPER12& o)
+	{
+		ensure(xltypeStr == type(o));
+
+		return std::wstring_view(o.val.str + 1, o.val.str[0]);
 	}
 
 	// heuristic to detect Excel date type
@@ -193,17 +206,28 @@ namespace xll {
 	}
 
 	template<class X>
-	inline void bind(sqlite::stmt& stmt, int j, const XOPER<X>& x)
+	inline void bind(sqlite::stmt& stmt, int j, const X& x)
 	{
-		switch (x.type()) {
+		switch (type(x)) {
 		case xltypeNum:
 			stmt.bind(j, x.val.num);
 			break;
 		case xltypeInt:
 			stmt.bind(j, x.val.w);
 			break;
-		case xltypeStr:
-			stmt.bind(j, view(x));
+		case xltypeStr: {
+			tm tm;
+			auto sv = xll::view(x);
+			if (0 == sv.len) {
+				stmt.bind(j);
+			}
+			if (fms::parse_tm(sv, &tm)) {
+				stmt.bind(j, _mkgmtime(&tm));
+			}
+			else {
+				stmt.bind(j, string_view(x));
+			}
+		}
 			break;
 		case xltypeBool:
 			stmt.bind(j, x.val.xbool != 0);
@@ -261,6 +285,14 @@ namespace xll {
 		}
 	}
 
+	template<class O, class X = O::value_type>
+	inline auto headers(sqlite::stmt& stmt, O& o)
+	{
+		for (int i = 0; i < stmt.column_count(); ++i) {
+			o.push_back(XOPER<X>(stmt[i].name()));
+		}
+	}
+
 	template<class O>
 	inline auto map(sqlite::stmt& stmt, O& o)
 	{
@@ -268,9 +300,10 @@ namespace xll {
 		sqlite::map(stmt, std::back_inserter(o), as_oper<X>);
 		
 		auto c = stmt.column_count();
-		ensure(0 == o.size() % c);
-
-		o.resize(o.size() / c, c);
+		if (c != 0) {
+			ensure(0 == o.size() % c);
+			o.resize(o.size() / c, c);
+		}
 	}
 	template<class O>
 	inline auto map(sqlite::iterator& i, O& o)

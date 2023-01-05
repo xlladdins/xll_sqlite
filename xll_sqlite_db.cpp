@@ -106,12 +106,13 @@ LPOPER WINAPI xll_sqlite_schema(HANDLEX db, const char* name)
 		sqlite::stmt stmt(*db_);
 
 		auto sql = std::string("SELECT * FROM sqlite_schema ")
-			+ (*name ? std::string("WHERE name = ") + sqlite::quote(name, '\'') : " ")
+			+ (*name ? std::string("WHERE name = ") + sqlite::variable_name(name) : " ")
 			+ "ORDER BY tbl_name, type DESC, name";
 
 		stmt.prepare(sql);
 
 		result = OPER{};
+		xll::headers(stmt, result);
 		xll::map(stmt, result);
 	}
 	catch (const std::exception& ex) {
@@ -148,6 +149,7 @@ LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma)
 		stmt.prepare(sql);
 
 		result = OPER{};
+		xll::headers(stmt, result);
 		xll::map(stmt, result);
 	}
 	catch (const std::exception& ex) {

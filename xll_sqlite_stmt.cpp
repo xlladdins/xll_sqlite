@@ -9,7 +9,7 @@ AddIn xai_sqlite_stmt(
 	.Arguments({Arg_db})
 	.Uncalced()
 	.Category(CATEGORY)
-	.FunctionHelp("Prepare a statement.")
+	.FunctionHelp("Create a statement.")
 	.HelpTopic("https://www.sqlite.org/c3ref/prepare.html")
 );
 HANDLEX WINAPI xll_sqlite_stmt(HANDLEX db)
@@ -73,7 +73,7 @@ AddIn xai_sqlite_stmt_db_handle(
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return the database handle associated with a statement.")
-	.HelpTopic("https://www.sqlite.org/c3ref/expanded_sql.html")
+	.HelpTopic("https://sqlite.org/c3ref/db_handle.html")
 );
 HANDLEX WINAPI xll_sqlite_stmt_db_handle(HANDLEX stmt)
 {
@@ -100,7 +100,7 @@ AddIn xai_sqlite_stmt_errmsg(
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return the error message associated with a statement.")
-	.HelpTopic("https://www.sqlite.org/c3ref/expanded_sql.html")
+	.HelpTopic("https://sqlite.org/c3ref/errcode.html")
 );
 LPOPER WINAPI xll_sqlite_stmt_errmsg(HANDLEX stmt)
 {
@@ -128,7 +128,7 @@ AddIn xai_sqlite_stmt_column_count(
 		})
 		.Category(CATEGORY)
 	.FunctionHelp("Return the error message associated with a statement.")
-	.HelpTopic("https://www.sqlite.org/c3ref/expanded_sql.html")
+	.HelpTopic("https://sqlite.org/c3ref/column_count.html")
 );
 double WINAPI xll_sqlite_stmt_column_count(HANDLEX stmt)
 {
@@ -156,7 +156,7 @@ AddIn xai_sqlite_stmt_column_name(
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return the column name at column index for a statement or all column names if not specified.")
-	.HelpTopic("https://www.sqlite.org/c3ref/expanded_sql.html")
+	.HelpTopic("https://sqlite.org/c3ref/column_name.html")
 );
 LPOPER WINAPI xll_sqlite_stmt_column_name(HANDLEX stmt, LPOPER pi)
 {
@@ -184,7 +184,7 @@ LPOPER WINAPI xll_sqlite_stmt_column_name(HANDLEX stmt, LPOPER pi)
 
 	return &result;
 }
-#if 0
+
 AddIn xai_sqlite_stmt_column_type(
 	Function(XLL_LPOPER, "xll_sqlite_stmt_column_type", CATEGORY ".COLUMN_TYPE")
 	.Arguments({
@@ -193,7 +193,7 @@ AddIn xai_sqlite_stmt_column_type(
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return the fundamental sqlite type at column index for a statement or all column names if not specified.")
-	.HelpTopic("https://www.sqlite.org/c3ref/expanded_sql.html")
+	.HelpTopic("https://sqlite.org/c3ref/column_blob.html")
 );
 LPOPER WINAPI xll_sqlite_stmt_column_type(HANDLEX stmt, LPOPER pi)
 {
@@ -209,10 +209,10 @@ LPOPER WINAPI xll_sqlite_stmt_column_type(HANDLEX stmt, LPOPER pi)
 			sqlite::iterator it(*stmt_);
 			result = OPER{};
 			sqlite::map(it, std::back_inserter(result), 
-				[](const sqlite::value& v) { return OPER(v.type()); });
+				[](const sqlite::value& v) { return OPER(sqlite::sqlname(v.column_type())); });
 		}
 		else {
-			result = (*stmt_)[pi->as_int()].type();
+			result = sqlite::sqlname((*stmt_)[pi->as_int()].column_type());
 		}
 	}
 	catch (const std::exception& ex) {
@@ -230,7 +230,7 @@ AddIn xai_sqlite_stmt_column_sqltype(
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return the column SQL type at index for a statement or all column sql types if not specified.")
-	.HelpTopic("https://www.sqlite.org/c3ref/expanded_sql.html")
+	.HelpTopic("https://sqlite.org/c3ref/column_blob.html")
 );
 LPOPER WINAPI xll_sqlite_stmt_column_sqltype(HANDLEX stmt, LPOPER pi)
 {
@@ -245,7 +245,7 @@ LPOPER WINAPI xll_sqlite_stmt_column_sqltype(HANDLEX stmt, LPOPER pi)
 		if (pi->is_missing()) {
 			sqlite::iterator it(*stmt_);
 			result = OPER{};
-			sqlite::map(it, std::back_inserter(result), 
+			sqlite::map(it, std::back_inserter(result),
 				[](const sqlite::value& v) { return OPER(v.column_decltype()); });
 		}
 		else {
@@ -258,7 +258,6 @@ LPOPER WINAPI xll_sqlite_stmt_column_sqltype(HANDLEX stmt, LPOPER pi)
 
 	return &result;
 }
-#endif // 0
 
 AddIn xai_sqlite_stmt_prepare(
 	Function(XLL_HANDLEX, "xll_sqlite_stmt_prepare", CATEGORY ".PREPARE")
@@ -345,6 +344,7 @@ LPOPER12 WINAPI xll_sqlite_stmt_exec(HANDLEX stmt)
 
 		result.reset();
 		stmt_->reset();
+		xll::headers(*stmt_, result);
 		xll::map(*stmt_, result);
 	}
 	catch (const std::exception& ex) {
@@ -381,6 +381,7 @@ LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, const LPOPER
 		sqlite_bind(stmt, *pval);
 		
 		result.reset();
+		xll::headers(stmt, result);
 		xll::map(stmt, result);
 	}
 	catch (const std::exception& ex) {
