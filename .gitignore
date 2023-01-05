@@ -364,3 +364,4 @@ FodyWeavers.xsd
 /fms_sqlite/tmp.db
 /tmp.db
 /fms_sqlite/fms_sqlite.h
+*.db
