@@ -47,7 +47,7 @@ const char* common_type(const char* a, const char* b)
 
 	return a;
 }
-#endif // 9
+#endif // 0
 
 AddIn xai_sqlite_types(
 	Function(XLL_LPOPER, "xll_sqlite_types", CATEGORY ".TYPES")
@@ -63,37 +63,51 @@ LPOPER WINAPI xll_sqlite_types(const LPOPER po)
 	static OPER o;
 
 	int type = guess_sqltype(*po);
-	o = sqlite_name(sqlite_type[type]);
+	o = sqlite::sqlname(type);
 
 	return &o;
 }
-#if 0
+
 AddIn xai_sqlite_insert_table(
 	Function(XLL_HANDLEX, "xll_sqlite_insert_table", CATEGORY ".INSERT_TABLE")
 	.Arguments({
 		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
-		Arg(XLL_PSTRING4, "table", "is the name of the table."),
+		Arg(XLL_CSTRING4, "table", "is the name of the table."),
 		Arg(XLL_LPOPER, "data", "is a range of data or a handle to a sqlite cursor."),
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Create a sqlite table in a database.")
 	.HelpTopic("https://www.sqlite.org/lang_insert.html")
 );
-HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const OPER& o)
+HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const LPOPER po)
 {
 #pragma XLLEXPORT
 	try {
 		handle<sqlite::db> db_(db);
 		ensure(db_);
+
+		const OPER& o = *po;
+		auto sql = std::string("INSERT INTO ")
+			+ sqlite::table_name(table)
+			+ " VALUES (?";
+		for (unsigned i = 1; i < o.columns(); ++i) {
+			sql.append(", ?");
+		}
+		sql.append(")");
+
+		sqlite::stmt stmt(*db_);
+		stmt.prepare(sql);
+		xll::iterable<XLOPER12> i(o);
+		xll::copy(i, stmt);
+	/*
 		if (o.size() == 1 && o.is_num()) {
 			handle<sqlite::cursor> cur_(o.as_num());
 			ensure(cur_);
-			sqlite::insert(*db_, table + 1, table[0], *cur_);
+			//sqlite::insert(*db_, table + 1, table[0], *cur_);
 		}
 		else {
-			xll::cursor<XLOPER12> cur(o);
-			sqlite::insert(*db_, table + 1, table[0], cur);
-		}
+		*/
+		/*}*/
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -103,7 +117,47 @@ HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const OPER
 
 	return db;
 }
-#endif // 0
+
+// " (column type, ...)"
+inline std::string create_table(const OPER& columns, const OPER& types)
+{
+	const char* comma = "";
+	auto ct = std::string(" (");
+	for (unsigned j = 0; j < columns.size(); ++j) {
+		ct.append(comma);
+		ct.append(columns[j] ? columns[j].to_string() : (OPER("col") & OPER(j)).to_string());
+		if (!types.is_missing()) {
+			ct.append(" ");
+			ct.append(types[j].to_string());
+		}
+		comma = ", ";
+	}
+	ct.append(")");
+
+	return ct;
+}
+inline std::string create_table(const OPER& data, OPER columns, OPER types)
+{
+	if (columns.is_missing()) {
+		columns.resize(1, data.columns());
+	}
+	else {
+		ensure(data.columns() == columns.size());
+	}
+	if (types.is_missing()) {
+		types.resize(1, data.columns());
+	}
+	else {
+		ensure(data.columns() == types.size());
+	}
+
+	for (unsigned j = 0; j < data.columns(); ++j) {
+		columns[j] = columns[j] ? columns[j] : data(0, j); // first row has column names
+		types[j] = types[j] ? types[j] : sqlite::sqlname(guess_sqltype(data(1, j)));
+	}
+
+	return create_table(columns, types);
+}
 
 AddIn xai_sqlite_create_table(
 	Function(XLL_HANDLEX, "xll_sqlite_create_table", CATEGORY ".CREATE_TABLE")
@@ -111,25 +165,17 @@ AddIn xai_sqlite_create_table(
 		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
 		Arg(XLL_CSTRING4, "name", "is the name of the table."),
 		Arg(XLL_LPOPER, "data", "is a range of data."),
-		Arg(XLL_LPOPER, "_columns", "is an optional range of column names."),
-		Arg(XLL_LPOPER, "_types", "is an optional range of column types."),
+		Arg(XLL_LPOPER, "columns", "is an optional range of column names."),
+		Arg(XLL_LPOPER, "types", "is an optional range of column types."),
 		})
 		.Category(CATEGORY)
-	.FunctionHelp("Create a sqlite table in a database.")
+	.FunctionHelp("Create a sqlite table in a database and populate if data is not missing.")
 	.HelpTopic("https://www.sqlite.org/lang_createtable.html")
 );
 HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pdata, LPOPER pcolumns, LPOPER ptypes)
 {
 #pragma XLLEXPORT
 	try {
-		ensure(!pdata->is_missing());
-		if (!pcolumns->is_missing()) {
-			ensure(pdata->columns() == pcolumns->size());
-		}
-		if (!ptypes->is_missing()) {
-			ensure(pdata->columns() == ptypes->size());
-		}
-
 		handle<sqlite::db> db_(db);
 		ensure(db_);
 
@@ -140,47 +186,39 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 
 		if (pcolumns->is_missing()) {
 			row = 1; // first row has column names
-			for (unsigned j = 0; j < data.columns(); ++j) {
-				column[j] = data(0, j);
-			}
-		}
-		else {
-			for (unsigned j = 0; j < data.columns(); ++j) {
-				column[j] = pcolumns->operator[](j);
-			}
 		}
 
-		if (ptypes->is_missing()) {
-			row = 1; // first row has column names
-			for (unsigned j = 0; j < data.columns(); ++j) {
-				type[j] = type_name(data(row, j));
-			}
+		auto ct = std::string("CREATE TABLE ")
+			+ sqlite::table_name(table);
+		if (pdata->is_missing()) {
+			ct.append(create_table(*pcolumns, *ptypes));
 		}
 		else {
-			for (unsigned j = 0; j < data.columns(); ++j) {
-				type[j] = ptypes->operator[](j);
-			}
+			ct.append(create_table(*pdata, *pcolumns, *ptypes));
 		}
-
-		OPER ct = OPER("CREATE TABLE [") & OPER(table) & OPER("] (");
-		const char* comma = "";
-		for (unsigned j = 0; j < data.columns(); ++j) {
-			ct &= comma;
-			ct &= column[j];
-			ct &= " ";
-			ct &= type[j];
-			comma = ", ";
-		}
-		ct &= ")";
 
 		sqlite::stmt stmt(*db_);
-		stmt.exec(ct.to_string());
+		stmt.exec(std::string("DROP TABLE IF EXISTS ") + sqlite::table_name(table));
+		stmt.exec(ct);
 
-		//sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
+		if (!pdata->is_missing()) {
+			auto sql = std::string("INSERT INTO ")
+				+ sqlite::table_name(table)
+				+ " VALUES (?";
+			for (unsigned j = 1; j < pdata->columns(); ++j) {
+				sql.append(", ?");
+			}
+			sql.append(")");
+			stmt.prepare(sql);
 
-		//xll::cursor
+			//sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
+	
+			xll::iterable i(*pdata, row);
+			copy(i, stmt);
 
-		//sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
+			//sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
+		}
+
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());

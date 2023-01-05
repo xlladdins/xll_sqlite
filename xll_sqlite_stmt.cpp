@@ -184,7 +184,7 @@ LPOPER WINAPI xll_sqlite_stmt_column_name(HANDLEX stmt, LPOPER pi)
 
 	return &result;
 }
-
+#if 0
 AddIn xai_sqlite_stmt_column_type(
 	Function(XLL_LPOPER, "xll_sqlite_stmt_column_type", CATEGORY ".COLUMN_TYPE")
 	.Arguments({
@@ -258,6 +258,7 @@ LPOPER WINAPI xll_sqlite_stmt_column_sqltype(HANDLEX stmt, LPOPER pi)
 
 	return &result;
 }
+#endif // 0
 
 AddIn xai_sqlite_stmt_prepare(
 	Function(XLL_HANDLEX, "xll_sqlite_stmt_prepare", CATEGORY ".PREPARE")

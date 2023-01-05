@@ -31,11 +31,17 @@ range of key-value pairs to bind based on the key name. The binding type is
 based on each value's Excel type.
 Statements are executed with [`=SQL.EXEC(stmt)`](https://www.sqlite.org/c3ref/exec.html).
 
-Sqlite tables are created from 
-[`=SQL.CREATE_TABLE(db, name, data, _columns, _types)`](https://www.sqlite.org/lang_createtable.html).
-The `_columns` and `_types` arguments are optional. If `_columns` are not specified then
-the first row of `data` is used for column names. The allowed `_types` are those specified
+Sqlite tables are created using 
+[`=SQL.CREATE_TABLE(db, name, data, columns, types)`](https://www.sqlite.org/lang_createtable.html).
+The the `columns` and `types` are used for the schema in `CREATE TABLE` and `data`
+are `INSERT INTO` to the table. If `data` is missing then the table is created.
+
+If `columns` are not specified then the first row of `data` is used for column names. 
+The allowed `_types` are those specified
 in the [Affinity Name Examples](https://www.sqlite.org/datatype3.html#affinity_name_examples).
+
+If `types` are not specified the data is inspected to guess the type.
+
 If table `name` exists it is dropped before being recreated.
 
 It is also possible to create tables from a query using 
