@@ -500,7 +500,7 @@ namespace xll {
 				}
 				std::string name = to_string(val(i, 0));
 				// check sql string for ':', '@', or '$'?
-				if (name[0] != ':') {
+				if (!::strchr(":@$", name[0])) {
 					name.insert(0, 1, ':');
 				}
 				pi = stmt.bind_parameter_index(name.c_str());

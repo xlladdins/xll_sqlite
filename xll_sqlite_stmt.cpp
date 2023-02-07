@@ -310,8 +310,8 @@ HANDLEX WINAPI xll_sqlite_stmt_bind(HANDLEX stmt, const LPOPER4 pval)
 		handle<sqlite::stmt> stmt_(stmt);
 		ensure(stmt_);
 
-		stmt_->reset();
-		stmt_->clear_bindings();
+		//stmt_->reset();
+		//stmt_->clear_bindings();
 		sqlite_bind(*stmt_, *pval);
 		
 		result = stmt;
