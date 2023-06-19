@@ -151,6 +151,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fms_sqlite\sqlite-amalgamation-3390400\sqlite3.c" />
+    <ClCompile Include="xll_lambda.cpp" />
     <ClCompile Include="xll_sqlite_table.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
@@ -168,6 +169,11 @@
   <ItemGroup>
     <None Include="NOTES.md" />
     <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="xll\xll.vcxproj">
+      <Project>{367249bb-b8a3-4671-b095-a5db904dbd6d}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
