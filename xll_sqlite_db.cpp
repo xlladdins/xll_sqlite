@@ -10,18 +10,16 @@ static const char* fullpath(const char* filename)
 	static char full[_MAX_PATH] = { 0 };
 	static path<char> base;
 
-	if (!base) {
-		ensure(0 == base.split(Excel4(xlGetName).to_string().c_str()));
-		char* t;
-		if (0 != (t = strstr(base.dir, "\\Debug"))) {
-			*t = 0;
-		}
-		else if (0 != (t = strstr(base.dir, "\\Release"))) {
-			*t = 0;
-		}
-		if (0 != (t = strstr(base.dir, "\\x64"))) {
-			*t = 0;
-		}
+	ensure(0 == base.split(Excel4(xlGetName).to_string().c_str()));
+	char* t;
+	if (0 != (t = strstr(base.dir, "\\Debug"))) {
+		*t = 0;
+	}
+	else if (0 != (t = strstr(base.dir, "\\Release"))) {
+		*t = 0;
+	}
+	if (0 != (t = strstr(base.dir, "\\x64"))) {
+		*t = 0;
 	}
 
 	path file(filename);
@@ -29,7 +27,11 @@ static const char* fullpath(const char* filename)
 		strcpy_s(base.fname, file.fname);
 		strcpy_s(base.ext, file.ext);
 	}
+	base.fname[0] = 0;
+	base.ext[0] = 0;
+
 	ensure(0 == base.make(full, _MAX_PATH));
+	strcat(full, filename);
 
 	//MessageBoxA(0, full,  "Full Path", MB_OK);
 
