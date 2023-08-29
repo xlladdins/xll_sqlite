@@ -530,6 +530,37 @@ namespace xll {
 			}
 		}
 	}
+	// Bind keys to values. Size is determined by key array. 
+	inline void sqlite_bind(sqlite::stmt& stmt, const OPER4& key, const OPER4& val)
+	{
+		size_t n = key.size();
+		ensure(val.size() >= n);
+
+		for (unsigned i = 0; i < n; ++i) {
+			const auto ki = key[i].to_string();
+			int pi = stmt.bind_parameter_index(ki.c_str());
+			if (!pi) {
+				XLL_WARNING((ki + ": not found").c_str());
+			}
+
+			const OPER4& vi = val[i];
+			if (vi.is_str()) {
+				stmt.bind(pi, std::string_view(vi.val.str + 1, vi.val.str[0]));
+			}
+			else if (vi.is_num()) {
+				stmt.bind(pi, vi.val.num);
+			}
+			else if (vi.is_nil()) {
+				stmt.bind(pi);
+			}
+			else if (vi.is_bool()) {
+				stmt.bind(pi, vi.val.xbool);
+			}
+			else {
+				ensure(!__FUNCTION__ ": value to bind must be number, string, or null");
+			}
+		}
+	}
 	/*
 	inline OPER sqlite_exec(sqlite::stmt& stmt, bool no_headers)
 	{
