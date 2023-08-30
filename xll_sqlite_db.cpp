@@ -231,7 +231,7 @@ AddIn xai_sqlite_where(
 		Arg(XLL_LPOPER, "range", "is a two dimensional range of propositions.")
 		})
 	.Category(CATEGORY)
-	.FunctionHelp("Return SQL WHERE using conjective normal form.")
+	.FunctionHelp("Return SQL WHERE clause using conjective normal form.")
 	.HelpTopic("https://en.wikipedia.org/wiki/Conjunctive_normal_form")
 );
 LPOPER WINAPI xll_sqlite_where(const LPOPER pw)
