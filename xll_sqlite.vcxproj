@@ -152,6 +152,7 @@
   <ItemGroup>
     <ClCompile Include="fms_sqlite\sqlite-amalgamation-3390400\sqlite3.c" />
     <ClCompile Include="xll_lambda.cpp" />
+    <ClCompile Include="xll_rules.cpp" />
     <ClCompile Include="xll_sqlite_table.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
