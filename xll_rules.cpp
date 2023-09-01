@@ -279,6 +279,7 @@ LPOPER WINAPI xll_sql_cnf(const LPOPER pw)
 	return &result;
 }
 
+
 #if 0
 
 /**********************************
