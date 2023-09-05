@@ -7,172 +7,198 @@
 
 using namespace xll;
 
+/*
+logical - and, or, not, xor, implies, equiv
+relation - =, <>, <, >, <=, >=
+binop - binop('name, name)
+
+name, logical('name) => "'name logical name"
+binop, name, logical, value('name) => "binop('name, name) logical @value"
+same_if, name, value('name) => "'name <> value OR name = value"
+*/
+
 namespace xll {
 
-class span {
-	XLOPER12* p;
-	unsigned off, count, step, curr;
-public:
-	span(OPER& o, unsigned off, unsigned count, unsigned step)
-		: p(o.val.array.lparray), off(off), count(count), step(step), curr(0)
-	{
-		ensure(o.type() == xltypeMulti);
-		ensure(off + count*step < o.size());
-		ensure(step > 0);
-	}
+	class slice {
+		const XLOPER12* p;
+		unsigned start, size, stride, i;
+	public:
+		slice(const XLOPER12* p, unsigned start, unsigned size, unsigned stride = 1, unsigned i = 0)
+			: p(p), start(start), size(size), stride(stride), i(0)
+		{
+			ensure(stride > 0);
+			ensure(i < size);
+		}
+		slice(const OPER& o, unsigned start, unsigned size, unsigned stride = 1)
+			: slice(&o[0u], start, size, stride)
+		{
+			ensure(start + (size - 1) * stride < o.size());
+		}
+		slice(const OPER& o)
+			: slice(o, 0, o.size(), 1)
+		{ }
+		slice(const slice&) = default;
+		slice& operator=(const slice&) = default;
+		~slice() = default;
 
-	explicit operator bool() const
-	{
-		return curr < count;
-	}
-	const XLOPER12& operator*() const
-	{
-		return p[off + curr*step];
-	}
-	span& operator++()
-	{
-		if (operator bool()) {
-			++curr;
+		bool operator==(const slice&) const = default;
+
+		auto begin() const
+		{
+			return slice(p, start, size, stride, 0);
+		}
+		auto end() const
+		{
+			return slice(p, start, size, stride, size);
 		}
 
-		return *this;
-	}
-	span operator++(int)
-	{
-		span s(*this);
+		explicit operator bool() const
+		{
+			return i < size;
+		}
+		const XLOPER12& operator*() const
+		{
+			return p[start + i * stride];
+		}
+		slice& operator++()
+		{
+			if (operator bool()) {
+				++i;
+			}
 
-		operator++();
+			return *this;
+		}
+		slice operator++(int)
+		{
+			slice s(*this);
+
+			operator++();
+
+			return s;
+		}
+	};
+
+	inline auto row(OPER& o, unsigned i)
+	{
+		ensure(i < o.rows());
+
+		return slice(o, i * o.columns(), o.columns(), 1);
+	}
+
+	inline auto column(OPER& o, unsigned j)
+	{
+		ensure(j < o.columns());
+
+		return slice(o, j, o.rows(), o.columns());
+	}
+
+
+	template<class UnOp>
+	inline void map(UnOp op, OPER& o)
+	{
+		for (unsigned j = 0; j < o.size(); ++j) {
+			o[j] = op(o[j]);
+		}
+	}
+
+	template<class UnOp, class S>
+	class apply {
+		UnOp op;
+		S s;
+	public:
+		apply(UnOp op, S s)
+			: op(op), s(s)
+		{ }
+
+		explicit operator bool() const
+		{
+			return s;
+		}
+		auto operator*() const
+		{
+			return op(*s);
+		}
+		apply& operator++()
+		{
+			++s;
+
+			return *this;
+		}
+		apply operator++(int)
+		{
+			apply a(*this);
+
+			operator++();
+
+			return a;
+		}
+	};
+
+	// convert to SQL type
+	inline OPER sql(const OPER& o)
+	{
+		OPER o_(o);
+
+		if (o.size() > 1) {
+			map(sql, o_);
+		}
+		else {
+			switch (o.type()) {
+			case xltypeNum:
+				o_ = Excel(xlfText, o, OPER("General"));
+				break;
+			case xltypeStr:
+				// quote unless already quoted
+				if (o.val.str[0] > 0 && (o.val.str[1] != '\'' && o.val.str[1] != '[')) {
+					o_ = Excel(xlfSubstitute, o, OPER("\'"), OPER("\'\'"));
+					o_ = OPER("\'") & o_ & OPER("\'");
+				}
+				break;
+			case xltypeBool:
+				o_ = OPER(o.val.xbool ? "TRUE" : "FALSE"); // SQL true and false
+				break;
+			default:
+				o_ = OPER("");
+			}
+		}
+
+		return o_;
+	}
+
+	inline bool empty(const XLOPER12& o)
+	{
+		return o.xltype == xltypeNil
+			|| o.xltype == xltypeMissing
+			|| o.xltype == xltypeErr
+			|| (o.xltype == xltypeStr && o.val.str[0] == 0);
+	}
+
+	template<class P, class S>
+	inline S skip(P p, S s)
+	{
+		while (s && p(*s)) {
+			++s;
+		}
 
 		return s;
 	}
-};
 
-inline auto row(OPER& o, unsigned i)
-{
-	ensure(i < o.rows());
-
-	return span(o, i*o.columns(), o.columns(), 1);
-}
-
-inline auto column(OPER& o, unsigned j)
-{
-	ensure(j < o.columns());
-
-	return span(o, j, o.rows(), o.columns());
-}
-
-inline span make_span(OPER& o)
-{
-	return span(o, 0, o.size(), 1);
-}
-
-template<class UnOp>
-inline void map(UnOp op, OPER& o)
-{
-	for (unsigned j = 0; j < o.size(); ++j) {
-		o[j] = op(o[j]);
-	}
-}	
-
-template<class UnOp>
-class apply {
-	UnOp op;
-	span s;
-public:
-	apply(UnOp op, span s)
-		: op(op), s(s)
-	{ }
-
-	explicit operator bool () const
+	inline OPER join(slice s, const OPER& sep)
 	{
-		return s;
-	}
-	auto operator*() const
-	{
-		return op(*s);
-	}
-	apply& operator++()
-	{
-		++s;
+		OPER o;
 
-		return *this;
-	}
-	apply operator++(int)
-	{
-		apply a(*this);
-
-		operator++();
-
-		return a;
-	}
-};
-
-// convert to SQL type
-inline OPER sql(const OPER& o)
-{
-	OPER o_(o);
-
-	if (o.size() > 1) {
-		map(sql, o_);
-	}
-	else {
-		switch (o.type()) {
-		case xltypeNum:
-			o_ = Excel(xlfText, o, OPER("General"));
-			break;
-		case xltypeStr:
-			// quote unless already quoted
-			if (o.val.str[0] > 0 && (o.val.str[1] != '\'' && o.val.str[1] != '[')) {
-				o_ = Excel(xlfSubstitute, o, OPER("\'"), OPER("\'\'"));
-				o_ = OPER("\'") & o_ & OPER("\'");
-			}
-			break;
-		case xltypeBool:
-			o_ = OPER(o.val.xbool ? "1=1" : "0=1"); // SQL true and false
-			break;
-		default:
-			o_ = OPER("");
-		}
-	}
-
-
-	return o_;
-}
-
-inline bool empty(const XLOPER12& o)
-{
-	return o.xltype == xltypeNil 
-		|| o.xltype == xltypeMissing 
-		|| o.xltype == xltypeErr
-		|| (o.xltype == xltypeStr && o.val.str[0] == 0);
-}
-
-template<class P>
-inline span skip(P p, span s)
-{
-	while (s && p(*s)) {
-		++s;
-	}
-
-	return s;
-}
-
-inline OPER join(span s, const OPER& sep)
-{
-	OPER o;
-
-	if (s = skip(empty, s)) {
-		o = *s;
-		while (++s) {
-			if (!empty(*s)) {
-				o &= sep;
-				o &= *s;
+		if (s = skip(empty, s)) {
+			o = *s;
+			while (++s) {
+				if (!empty(*s)) {
+					o &= sep;
+					o &= *s;
+				}
 			}
 		}
-	}
 
-	return o;
-}
+		return o;
+	}
 
 } // namespace xll
 
@@ -192,7 +218,6 @@ LPOPER WINAPI xll_sql_to_sql(const LPOPER pstmts)
 	try {
 		result = *pstmts;
 		map(sql, result);
-
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -200,6 +225,11 @@ LPOPER WINAPI xll_sql_to_sql(const LPOPER pstmts)
 	}
 
 	return &result;
+}
+
+inline OPER infix(OPER o, const OPER& op, const OPER& l = OPER(""), const OPER& r = OPER(""))
+{
+	return l & join(slice(o), op) & r;
 }
 
 AddIn xai_sql_and(
@@ -216,9 +246,7 @@ LPOPER WINAPI xll_sql_and(const LPOPER pstmts)
 	static OPER result;
 
 	try {
-		result = *pstmts;
-		map(sql, result);
-		result = OPER("(") & join(make_span(result), OPER(") AND (")) & OPER(")");
+		result = infix(*pstmts, OPER(L") AND ("), OPER(L"("), OPER(L")"));
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -241,9 +269,7 @@ LPOPER WINAPI xll_sql_or(const LPOPER pstmts)
 	static OPER result;
 
 	try {
-		result = *pstmts;
-		map(sql, result);
-		result = OPER("(") & join(make_span(result), OPER(") OR (")) & OPER(")");
+		result = infix(*pstmts, OPER(") OR ("), OPER("("), OPER(")"));
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -251,6 +277,8 @@ LPOPER WINAPI xll_sql_or(const LPOPER pstmts)
 
 	return &result;
 }
+
+#if 0
 
 AddIn xai_sql_cnf(
 	Function(XLL_LPOPER, "xll_sql_cnf", CATEGORY ".CNF")
@@ -280,13 +308,11 @@ LPOPER WINAPI xll_sql_cnf(const LPOPER pw)
 }
 
 
-#if 0
-
 /**********************************
 
 @quantity le 500      | @quantity ge 500
 @quantity eq quantity | reldiff le 0.1
-                      | quantity ge 500
+					  | quantity ge 500
 
 **********************************/
 AddIn xai_sql_cases(
@@ -295,7 +321,7 @@ AddIn xai_sql_cases(
 		Arg(XLL_LPOPER, "Cases", "is a list of cases."),
 		Arg(XLL_LPOPER, "Rules", "is a list of rules."),
 		})
-	.Category(CATEGORY)
+		.Category(CATEGORY)
 	.FunctionHelp("Return SQL WHERE clause for query.")
 );
 LPOPER WINAPI xll_rules(LPOPER pcases, LPOPER prules)
