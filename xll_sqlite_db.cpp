@@ -1,4 +1,5 @@
 ﻿// xll_sqlite_db.cpp - Sqlite3 bindings.
+#include <format>
 #include "xll_sqlite.h"
 
 using namespace xll;
@@ -9,18 +10,16 @@ static const char* fullpath(const char* filename)
 	static char full[_MAX_PATH] = { 0 };
 	static path<char> base;
 
-	if (!base) {
-		ensure(0 == base.split(Excel4(xlGetName).to_string().c_str()));
-		char* t;
-		if (0 != (t = strstr(base.dir, "\\Debug"))) {
-			*t = 0;
-		}
-		else if (0 != (t = strstr(base.dir, "\\Release"))) {
-			*t = 0;
-		}
-		if (0 != (t = strstr(base.dir, "\\x64"))) {
-			*t = 0;
-		}
+	ensure(0 == base.split(Excel4(xlGetName).to_string().c_str()));
+	char* t;
+	if (0 != (t = strstr(base.dir, "\\Debug"))) {
+		*t = 0;
+	}
+	else if (0 != (t = strstr(base.dir, "\\Release"))) {
+		*t = 0;
+	}
+	if (0 != (t = strstr(base.dir, "\\x64"))) {
+		*t = 0;
 	}
 
 	path file(filename);
@@ -28,7 +27,11 @@ static const char* fullpath(const char* filename)
 		strcpy_s(base.fname, file.fname);
 		strcpy_s(base.ext, file.ext);
 	}
+	base.fname[0] = 0;
+	base.ext[0] = 0;
+
 	ensure(0 == base.make(full, _MAX_PATH));
+	strcat(full, filename);
 
 	//MessageBoxA(0, full,  "Full Path", MB_OK);
 
@@ -80,4 +83,116 @@ HANDLEX WINAPI xll_sqlite_db(const char* filename, LONG flags)
 	}
 
 	return result;
+}
+
+AddIn xai_sqlite_schema(
+	Function(XLL_LPOPER, "xll_sqlite_schema", CATEGORY ".SCHEMA")
+	.Arguments({
+		Arg_db,
+		Arg(XLL_CSTRING4, "_name", "is the optional table name.")
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return information from sqlite_schema and table if name is specified.")
+	.HelpTopic("https://www.sqlite.org/schematab.html")
+);
+LPOPER WINAPI xll_sqlite_schema(HANDLEX db, const char* name)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		result = ErrNA;
+		handle<sqlite::db> db_(db);
+		ensure(db_);
+
+		sqlite::stmt stmt(*db_);
+
+		auto sql = std::string("SELECT * FROM sqlite_schema ")
+			+ (*name ? std::string("WHERE name = ") + sqlite::variable_name(name) : " ")
+			+ "ORDER BY tbl_name, type DESC, name";
+
+		stmt.prepare(sql);
+
+		result = OPER{};
+		xll::headers(stmt, result);
+		xll::map(stmt, result);
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &result;
+}
+
+AddIn xai_sqlite_pragma(
+	Function(XLL_LPOPER, "xll_sqlite_pragma", CATEGORY ".PRAGMA")
+	.Arguments({
+		Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database."),
+		Arg(XLL_CSTRING4, "_pragma", "is an optional pragma name."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Call 'PRAGMA pragma' or return all pragmas if omitted.")
+	.HelpTopic("https://www.sqlite.org/pragma.html")
+);
+LPOPER WINAPI xll_sqlite_pragma(HANDLEX db, const char* pragma)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		result = ErrNA;
+		handle<sqlite::db> db_(db);
+		ensure(db_);
+
+		auto sql = std::string("PRAGMA ")
+			+ (*pragma ? pragma : "pragma_list");
+
+		sqlite::stmt stmt(*db_);
+		stmt.prepare(sql);
+
+		result = OPER{};
+		xll::headers(stmt, result);
+		xll::map(stmt, result);
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+	}
+
+	return &result;
+}
+
+AddIn xai_sqlite_table_list(
+	Function(XLL_LPOPER, "xll_sqlite_table_list", CATEGORY ".TABLE_LIST")
+	.Arguments({
+		Arg_db,
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Call PRAGMA table_list.")
+	.HelpTopic("https://www.sqlite.org/pragma.html#pragma_table_list")
+);
+LPOPER WINAPI xll_sqlite_table_list(HANDLEX db)
+{
+#pragma XLLEXPORT
+
+	return xll_sqlite_pragma(db, "table_list");
+}
+
+AddIn xai_sqlite_table_info(
+	Function(XLL_LPOPER, "xll_sqlite_table_info", CATEGORY ".TABLE_INFO")
+	.Arguments({
+		Arg_db,
+		Arg(XLL_CSTRING4, "name", "is the name of the table."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Call PRAGMA table_info(table).")
+	.HelpTopic("https://www.sqlite.org/pragma.html#pragma_table_info")
+);
+LPOPER WINAPI xll_sqlite_table_info(HANDLEX db, const char* table)
+{
+#pragma XLLEXPORT
+	handle<sqlite::db> db_(db);
+
+	auto pragma = std::string("table_info(") + sqlite::table_name(table) + ")";
+
+	return xll_sqlite_pragma(db, pragma.c_str());
 }

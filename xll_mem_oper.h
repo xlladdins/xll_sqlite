@@ -26,12 +26,13 @@ namespace xll::mem {
 	};
 
 	template<class X, class T = typename traits<X>::xchar>
-	class OPER : public X {
+	class XOPER : public X {
 		static inline Win::mem_view<X> xloper;
 		static inline Win::mem_view<T> str;
 	public:
 		using X::val;
 		using X::xltype;
+		using value_type = typename X;
 		using xrw = typename traits<X>::xrw;
 		using xcol = typename traits<X>::xcol;
 		using xchar = typename traits<X>::xchar;
@@ -40,19 +41,20 @@ namespace xll::mem {
 		{
 			xloper.reset(len);
 			str.reset(len);
+			xltype = xltypeNil;
 		}
 
-		OPER()
+		XOPER()
 			: X{.xltype = xltypeNil}
 		{ }
-		OPER(const OPER&) = delete;
-		OPER(OPER&& o) noexcept
+		//XOPER(const XOPER&) = delete;
+		XOPER(const XOPER& o) noexcept
 		{
 			xltype = o.xltype;
 			val = o.val;
 		}
-		OPER& operator=(const OPER&) = delete;
-		OPER& operator=(OPER&& o) 
+		//XOPER& operator=(const XOPER&) = delete;
+		XOPER& operator=(const XOPER& o) noexcept
 		{
 			if (this != &o) {
 				xltype = o.xltype;
@@ -61,7 +63,7 @@ namespace xll::mem {
 
 			return *this;
 		}
-		~OPER()
+		~XOPER()
 		{ }
 
 		operator X& ()
@@ -85,39 +87,40 @@ namespace xll::mem {
 		{
 			return rows() * columns();
 		}
-
-		OPER& reshape(xrw r, xcol c)
+		// reshape
+		XOPER& resize(xrw r, xcol c)
 		{
-			ensure(xltype == xltypeMulti);
-			ensure(r * c == size());
+			if (xltype == xltypeMulti) {
+				ensure(r * c == size());
 
-			val.array.rows = r;
-			val.array.columns = c;
+				val.array.rows = r;
+				val.array.columns = c;
+			}
 
 			return *this;
 		}
 
-		explicit OPER(const X& x)
+		explicit XOPER(const X& x)
 		{
 			if (x.xltype == xltypeStr) {
-				*this = OPER(x.val.str + 1, x.val.str[0]);
+				*this = XOPER<X>(x.val.str + 1, x.val.str[0]);
 			}
 			else if (x.xltype == xltypeMulti) {
-				*this = OPER(x.val.array.rows, x.val.array.columns, x.val.array.lparray);
+				*this = XOPER<X>(x.val.array.rows, x.val.array.columns, x.val.array.lparray);
 			}
 			else {
 				xltype = x.xltype;
 				val = x.val;
 			}
 		}
-		OPER& operator=(const X& x)
+		XOPER& operator=(const X& x)
 		{
 			if (this != &x) {
 				if (x.xltype == xltypeStr) {
-					*this = OPER(x.val.str + 1, x.val.str[0]);
+					*this = XOPER<X>(x.val.str + 1, x.val.str[0]);
 				}
 				else if (x.xltype == xltypeMulti) {
-					*this = OPER(x.val.array.rows, x.val.array.columns, x.val.array.lparray);
+					*this = XOPER<X>(x.val.array.rows, x.val.array.columns, x.val.array.lparray);
 				}
 				else {
 					xltype = x.xltype;
@@ -129,68 +132,68 @@ namespace xll::mem {
 		}
 
 		// Num
-		explicit OPER(double num)
+		explicit XOPER(double num)
 			: X{.val = {.num = num}, .xltype = xltypeNum}
 		{ }
-		OPER& operator=(double num)
+		XOPER& operator=(double num)
 		{
-			*this = OPER(num);
+			*this = XOPER<X>(num);
 
 			return *this;
 		}
 		// Str
-		OPER(const xchar* _str, xchar _len)
+		XOPER(const xchar* _str, xchar _len)
 			: X{ .val = {.str = str.end()}, .xltype = xltypeStr }
 		{
 			str.append(_len);
 			str.append(_str, _len);
 		}
 		// counted Str
-		explicit OPER(const xchar* _str)
-			: OPER(_str + 1, _str[0])
+		explicit XOPER(const xchar* _str)
+			: XOPER(_str + 1, _str[0])
 		{ }
-		explicit OPER(const std::span<xchar>& str)
-			: OPER(str.data(), (xchar)str.size())
+		explicit XOPER(const std::span<xchar>& str)
+			: XOPER(str.data(), (xchar)str.size())
 		{ }
-		OPER& operator=(const std::span<xchar>& str)
+		XOPER& operator=(const std::span<xchar>& str)
 		{
-			*this = OPER(str);
+			*this = XOPER<X>(str);
 
 			return *this;
 		}
 		// Bool
-		explicit OPER(bool xbool)
+		explicit XOPER(bool xbool)
 			: X{ .val = {.xbool = xbool}, .xltype = xltypeBool }
 		{ }
 		// Err
-		explicit OPER(typename traits<X>::xerr err)
+		explicit XOPER(typename traits<X>::xerr err)
 			: X{ .val = {.err = err}, .xltype = xltypeErr }
 		{ }
 		// Multi
-		OPER(xrw r, xcol c)
+		XOPER(xrw r, xcol c)
 			: X{ .val = {.array = {.lparray = xloper.end(), .rows = r, .columns = c}}, .xltype = xltypeMulti }
 		{
 			for (int i = 0; i < r * c; ++i) {
-				xloper.append(OPER{});
+				xloper.append(XOPER<X>{});
 			}
 		}
-		OPER(xrw r, xcol c, const X* pa)
-			: OPER(r, c)
+		XOPER(xrw r, xcol c, const X* pa)
+			: XOPER(r, c)
 		{
 			for (int i = 0; i < r * c; ++i) {
 				ensure(pa[i].xltype != xltypeMulti);
-				val.array.lparray[i] = OPER(pa[i]);
+				val.array.lparray[i] = XOPER<X>(pa[i]);
 			}
 		}
 
-		OPER& push_back(const X& x)
+		XOPER& push_back(const X& x)
 		{
 			if (xltype == xltypeNil) {
-				*this = OPER(1,1,&x);
+				*this = XOPER<X>(1,1,&x);
 			}
 			else {
 				ensure(xltype == xltypeMulti);
-				xloper.append(OPER(x));
+				xloper.append(XOPER<X>(x));
 
 				if (val.array.rows == 1) {
 					++val.array.columns;
@@ -206,5 +209,9 @@ namespace xll::mem {
 			return *this;
 		}
 	};
+	using OPER12 = XOPER<XLOPER12>;
+	using OPER4 = XOPER<XLOPER>;
+	using OPER = XOPER<XLOPER12>;
+
 
 } // namespace xll::mem

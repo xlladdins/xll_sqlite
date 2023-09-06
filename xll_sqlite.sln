@@ -10,6 +10,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xll_sqlite", "xll_sqlite.vc
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xll", "xll\xll.vcxproj", "{367249BB-B8A3-4671-B095-A5DB904DBD6D}"
 EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "setup", "setup\setup.vdproj", "{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -34,6 +36,14 @@ Global
 		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Release|x64.Build.0 = Release|x64
 		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Release|x86.ActiveCfg = Release|Win32
 		{367249BB-B8A3-4671-B095-A5DB904DBD6D}.Release|x86.Build.0 = Release|Win32
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Debug|x64.ActiveCfg = Debug
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Debug|x64.Build.0 = Debug
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Debug|x86.ActiveCfg = Debug
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Debug|x86.Build.0 = Debug
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Release|x64.ActiveCfg = Release
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Release|x64.Build.0 = Release
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Release|x86.ActiveCfg = Release
+		{9826C5E9-C1E2-4B31-BAA4-09C147C0AA41}.Release|x86.Build.0 = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

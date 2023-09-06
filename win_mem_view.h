@@ -20,7 +20,7 @@ namespace Win {
 		/// </summary>
 		/// <param name="h">optional handle to file</param>
 		/// <param name="len">initial size of buffer</param>
-		mem_view(HANDLE h_ = INVALID_HANDLE_VALUE, DWORD max_len = 1 << 23)
+		mem_view(HANDLE h_ = INVALID_HANDLE_VALUE, DWORD max_len = 1 << 25)
 			: h(CreateFileMapping(h_, 0, PAGE_READWRITE, 0, max_len * sizeof(T), nullptr)), 
 			  max_len(max_len), buf(nullptr), len(0)
 		{
@@ -78,6 +78,9 @@ namespace Win {
 		// Write to buffered memory.
 		mem_view& append(const T* s, DWORD n)
 		{
+			if (len + n >= max_len) {
+				n = n;
+			}
 			ensure(h && len + n < max_len);
 			if (n) {
 				std::copy(s, s + n, buf + len);
