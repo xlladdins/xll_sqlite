@@ -8,13 +8,13 @@
 using namespace xll;
 
 /*
-logical - and, or, not, xor, implies, equiv
+logical - and, or, not, // xor, implies, equiv
 relation - =, <>, <, >, <=, >=
 binop - binop('name, name)
 
 name, logical('name) => "'name logical name"
 binop, name, logical, value('name) => "binop('name, name) logical @value"
-same_if, name, value('name) => "'name <> value OR name = value"
+implies, name, value('name) => "'name <> value OR name = value"
 */
 
 namespace xll {
