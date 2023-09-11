@@ -7,6 +7,319 @@
 
 using namespace xll;
 
+namespace fms {
+
+	template<class T>
+	inline std::string quote(const T& t)
+	{
+		return std::format("{}", t);
+	}
+	template<>
+	inline std::string quote(const std::string& t)
+	{
+		return std::format("'{}'", t);
+	}
+	inline std::string quote(const char* t)
+	{
+		return std::format("'{}'", t);
+	}
+
+	using vs = std::string; // std::vector<std::string>;
+
+	struct rule {
+		virtual ~rule() = default;
+
+		// Fields given the portfolioId
+		vs query()
+		{
+			return _query();
+		}
+		vs bind()
+		{
+			return _bind();
+		}
+		vs select()
+		{
+			return _select();
+		}
+		vs as()
+		{
+			return _as();
+		}
+		vs where()
+		{
+			return _where();
+		}
+	private:
+		virtual vs _query() = 0;
+		virtual vs _bind() = 0;
+		virtual vs _select() = 0;
+		virtual vs _where() = 0;
+		virtual vs _as() = 0;
+	};
+
+	static inline std::map<std::string, std::string> rels{
+		{ "eq", "=" },
+		{ "ne", "<>" },
+		{ "lt", "<" },
+		{ "le", "<=" },
+		{ "gt", ">" },
+		{ "ge", ">=" },
+	};
+
+	// name rel
+	// BIND @name value
+	// SELECT name as name
+	// WHERE @name rel name
+	struct logical : public rule {
+		std::string name, rel;
+
+		logical(const char* name, const char* rel)
+			: name(name), rel(rel)
+		{
+			if (rels.find(rel) == rels.end()) {
+				throw std::invalid_argument("fms::logical: invalid relation");
+			}
+		}
+
+		vs _query() override
+		{
+			return name;
+		}
+		vs _bind() override
+		{
+			return std::format("@{}", name);
+		}
+		vs _select() override
+		{
+			return name;
+		}
+		vs _as() override
+		{
+			return name;
+		}
+		vs _where() override
+		{
+			return std::format("(@{} {} {})", name, rels[rel], name);
+		}
+	};
+
+	// measure(@name, name) rel value
+	// BIND @name value
+	struct measure : public rule {
+		static inline std::map<std::string, std::string> funs{
+			{ "absolute", "{ABS(@{} - {})" },
+			{ "relative", "{ABS((@{} - {})/@{})" },
+		};
+		std::string fun, name, rel;
+
+		measure(const char* fun, const char* name, const char* rel)
+			: fun(fun), name(name), rel(rel)
+		{
+			if (funs.find(fun) == funs.end()) {
+				throw std::invalid_argument("fms::measure: invalid function");
+			}
+		}
+
+		vs _query() override
+		{
+			return name;
+		}
+		vs _bind() override
+		{
+			return std::format("@{}", _as());
+		}
+		vs _select() override
+		{
+			return std::vformat(funs[fun], std::make_format_args(name, name));
+		}
+		vs _as() override
+		{
+			return std::format("{}_{}_{}", fun, name, rel);
+		}
+		vs _where() override
+		{
+			return std::format("({} {} @{})", _as(), rels[rel], _as());
+		}
+	};
+
+	// select op('name,name) as op_name
+	// where name_op rel @value
+
+} // namespace fms
+
+AddIn xai_rule_query(
+	Function(XLL_LPOPER, "xll_rule_query", CATEGORY ".RULE.QUERY")
+	.Arguments({
+		Arg(XLL_HANDLEX, "rule", "is a handle to a rule."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return fields to query.")
+);
+LPOPER WINAPI xll_rule_query(HANDLEX rule)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		handle<fms::rule> r(rule);
+		ensure(r);
+
+		result = r->query().c_str();
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+		result = ErrNA;
+	}
+
+	return &result;
+}
+
+AddIn xai_rule_bind(
+	Function(XLL_LPOPER, "xll_rule_bind", CATEGORY ".RULE.BIND")
+	.Arguments({
+		Arg(XLL_HANDLEX, "rule", "is a handle to a rule."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return fields to bind.")
+);
+LPOPER WINAPI xll_rule_bind(HANDLEX rule)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		handle<fms::rule> r(rule);
+		ensure(r);
+
+		result = r->bind().c_str();
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+		result = ErrNA;
+	}
+
+	return &result;
+}
+
+AddIn xai_rule_select(
+	Function(XLL_LPOPER, "xll_rule_select", CATEGORY ".RULE.SELECT")
+	.Arguments({
+		Arg(XLL_HANDLEX, "rule", "is a handle to a rule."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return fields to select.")
+);
+LPOPER WINAPI xll_rule_select(HANDLEX rule)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		handle<fms::rule> r(rule);
+		ensure(r);
+
+		result = r->select().c_str();
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+		result = ErrNA;
+	}
+
+	return &result;
+}
+
+AddIn xai_rule_as(
+	Function(XLL_LPOPER, "xll_rule_as", CATEGORY ".RULE.AS")
+	.Arguments({
+		Arg(XLL_HANDLEX, "rule", "is a handle to a rule."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return fields to as.")
+);
+LPOPER WINAPI xll_rule_as(HANDLEX rule)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		handle<fms::rule> r(rule);
+		ensure(r);
+
+		result = r->as().c_str();
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+		result = ErrNA;
+	}
+
+	return &result;
+}
+
+AddIn xai_rule_where(
+	Function(XLL_LPOPER, "xll_rule_where", CATEGORY ".RULE.WHERE")
+	.Arguments({
+		Arg(XLL_HANDLEX, "rule", "is a handle to a rule."),
+		})
+	.Category(CATEGORY)
+	.FunctionHelp("Return fields to where.")
+);
+LPOPER WINAPI xll_rule_where(HANDLEX rule)
+{
+#pragma XLLEXPORT
+	static OPER result;
+
+	try {
+		handle<fms::rule> r(rule);
+		ensure(r);
+
+		result = r->where().c_str();
+	}
+	catch (const std::exception& ex) {
+		XLL_ERROR(ex.what());
+		result = ErrNA;
+	}
+
+	return &result;
+}
+
+AddIn xai_rule_logical(
+	Function(XLL_HANDLEX, "xll_rule_logical", "\\" CATEGORY ".RULE_LOGICAL")
+	.Arguments({
+		Arg(XLL_CSTRING4, "name", "is a name."),
+		Arg(XLL_CSTRING4, "rel", "is a relation."),
+		})
+	.Uncalced()
+	.Category(CATEGORY)
+	.FunctionHelp("Return a logical rule.")
+);
+HANDLEX WINAPI xll_rule_logical(const char* name, const char* rel)
+{
+#pragma XLLEXPORT
+	handle<fms::rule> h(new fms::logical(name, rel));
+
+	return h.get();
+}
+
+AddIn xai_rule_measure(
+	Function(XLL_HANDLEX, "xll_rule_measure", "\\" CATEGORY ".RULE_MEASURE")
+	.Arguments({
+		Arg(XLL_CSTRING4, "function", "is a function."),
+		Arg(XLL_CSTRING4, "name", "is a name."),
+		Arg(XLL_CSTRING4, "rel", "is a relation."),
+		})
+	.Uncalced()
+	.Category(CATEGORY)
+	.FunctionHelp("Return a measure rule.")
+);
+HANDLEX WINAPI xll_rule_measure(const char* function, const char* name, const char* rel)
+{
+#pragma XLLEXPORT
+	handle<fms::rule> h(new fms::measure(function, name, rel));
+
+	return h.get();
+}
+
 /*
 logical - and, or, not, // xor, implies, equiv
 relation - =, <>, <, >, <=, >=
