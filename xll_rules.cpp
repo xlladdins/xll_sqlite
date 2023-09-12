@@ -38,9 +38,9 @@ namespace fms {
 		{
 			return _bind();
 		}
-		vs select()
+		vs select(const std::string& value)
 		{
-			return _select();
+			return _select(value);
 		}
 		vs as()
 		{
@@ -53,7 +53,7 @@ namespace fms {
 	private:
 		virtual vs _query() = 0;
 		virtual vs _bind() = 0;
-		virtual vs _select() = 0;
+		virtual vs _select(const std::string&) = 0;
 		virtual vs _where() = 0;
 		virtual vs _as() = 0;
 	};
@@ -90,7 +90,7 @@ namespace fms {
 		{
 			return std::format("@{}", name);
 		}
-		vs _select() override
+		vs _select(const std::string&) override
 		{
 			return name;
 		}
@@ -108,8 +108,8 @@ namespace fms {
 	// BIND @name value
 	struct measure : public rule {
 		static inline std::map<std::string, std::string> funs{
-			{ "absolute", "{ABS(@{} - {})" },
-			{ "relative", "{ABS((@{} - {})/@{})" },
+			{ "absolute", "ABS({0} - {1})" },
+			{ "relative", "ABS(({0} - {1})/@{0})" },
 		};
 		std::string fun, name, rel;
 
@@ -129,9 +129,9 @@ namespace fms {
 		{
 			return std::format("@{}", _as());
 		}
-		vs _select() override
+		vs _select(const std::string& value) override
 		{
-			return std::vformat(funs[fun], std::make_format_args(name, name));
+			return std::vformat(funs[fun], std::make_format_args(value, name));
 		}
 		vs _as() override
 		{
@@ -143,8 +143,38 @@ namespace fms {
 		}
 	};
 
-	// select op('name,name) as op_name
-	// where name_op rel @value
+	// category(name, value)
+	// BIND @name value
+	struct category : public rule {
+		std::string name, cat;
+
+		category(const char* name, const char* cat)
+			: name(name), cat(cat)
+		{
+		}
+
+		vs _query() override
+		{
+			return name;
+		}
+		vs _bind() override
+		{
+			return std::format("@{}", _as());
+		}
+		vs _select(const std::string& /*value*/) override
+		{
+			return "";// std::format("{} <> {} OR {} = {}", ;
+		}
+		vs _as() override
+		{
+			return ""; // std::format("{}_{}_{}", fun, name, rel);
+		}
+		vs _where() override
+		{
+			return ""; // std::format("({} {} @{})", _as(), rels[rel], _as());
+		}
+	};
+
 
 } // namespace fms
 
@@ -206,11 +236,12 @@ AddIn xai_rule_select(
 	Function(XLL_LPOPER, "xll_rule_select", CATEGORY ".RULE.SELECT")
 	.Arguments({
 		Arg(XLL_HANDLEX, "rule", "is a handle to a rule."),
+		Arg(XLL_LPOPER, "value", "is a value to select."),
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return fields to select.")
 );
-LPOPER WINAPI xll_rule_select(HANDLEX rule)
+LPOPER WINAPI xll_rule_select(HANDLEX rule, const LPOPER pvalue)
 {
 #pragma XLLEXPORT
 	static OPER result;
@@ -219,7 +250,8 @@ LPOPER WINAPI xll_rule_select(HANDLEX rule)
 		handle<fms::rule> r(rule);
 		ensure(r);
 
-		result = r->select().c_str();
+		OPER value = Excel(xlfText, *pvalue, OPER("General"));
+		result = r->select(value.to_string()).c_str();
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
@@ -316,6 +348,24 @@ HANDLEX WINAPI xll_rule_measure(const char* function, const char* name, const ch
 {
 #pragma XLLEXPORT
 	handle<fms::rule> h(new fms::measure(function, name, rel));
+
+	return h.get();
+}
+
+AddIn xai_rule_category(
+	Function(XLL_HANDLEX, "xll_rule_category", "\\" CATEGORY ".RULE_CATEGORY")
+	.Arguments({
+		Arg(XLL_CSTRING4, "name", "is a function."),
+		Arg(XLL_CSTRING4, "category", "is a name."),
+		})
+		.Uncalced()
+	.Category(CATEGORY)
+	.FunctionHelp("Return a category rule.")
+);
+HANDLEX WINAPI xll_rule_category(const char* name, const char* category)
+{
+#pragma XLLEXPORT
+	handle<fms::rule> h(new fms::category(name, category));
 
 	return h.get();
 }
