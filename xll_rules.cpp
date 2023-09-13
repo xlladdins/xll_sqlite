@@ -29,23 +29,27 @@ namespace fms {
 	struct rule {
 		virtual ~rule() = default;
 
-		// Fields given the portfolioId
+		// Fields to select given positionId
 		vs query()
 		{
 			return _query();
 		}
+		// Parameters for WHERE clause.
 		vs bind()
 		{
 			return _bind();
 		}
+		// What to SELECT.
 		vs select(const std::string& value)
 		{
 			return _select(value);
 		}
+		// Name of field SELECTed.
 		vs as()
 		{
 			return _as();
 		}
+		// Condition to restrict query.
 		vs where()
 		{
 			return _where();
@@ -74,6 +78,7 @@ namespace fms {
 	struct logical : public rule {
 		std::string name, rel;
 
+		// @name rel name
 		logical(const char* name, const char* rel)
 			: name(name), rel(rel)
 		{
@@ -104,12 +109,12 @@ namespace fms {
 		}
 	};
 
-	// measure(@name, name) rel value
 	// BIND @name value
+	// measure(@name, name) rel value
 	struct measure : public rule {
 		static inline std::map<std::string, std::string> funs{
 			{ "absolute", "ABS({0} - {1})" },
-			{ "relative", "ABS(({0} - {1})/@{0})" },
+			{ "relative", "ABS(({0} - {1})/{0})" },
 		};
 		std::string fun, name, rel;
 
@@ -144,12 +149,12 @@ namespace fms {
 	};
 
 	// category(name, value)
-	// BIND @name value
+	// WHERE name = value
 	struct category : public rule {
-		std::string name, cat;
+		std::string name, value;
 
-		category(const char* name, const char* cat)
-			: name(name), cat(cat)
+		category(const char* name, const char* value)
+			: name(name), value(value)
 		{
 		}
 
@@ -160,6 +165,38 @@ namespace fms {
 		vs _bind() override
 		{
 			return std::format("@{}", _as());
+		}
+		vs _select(const std::string&) override
+		{
+			return name;
+		}
+		vs _as() override
+		{
+			return "name"; // std::format("{}_{}_{}", fun, name, rel);
+		}
+		vs _where() override
+		{
+			return "";// std::format("({} <> {}) or ({} = {})", value, name, );
+		}
+	};
+
+	// implies(name, value)
+	// BIND @name value
+	struct implies : public rule {
+		std::string name, value;
+
+		implies(const char* name, const char* value)
+			: name(name), value(value)
+		{
+		}
+
+		vs _query() override
+		{
+			return name;
+		}
+		vs _bind() override
+		{
+			return "";
 		}
 		vs _select(const std::string& /*value*/) override
 		{
