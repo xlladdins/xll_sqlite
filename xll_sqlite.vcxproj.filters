@@ -47,9 +47,6 @@
     <ClCompile Include="xll_lambda.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="xll_rules.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

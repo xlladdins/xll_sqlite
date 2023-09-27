@@ -4,6 +4,7 @@
 
 using namespace xll;
 
+#if 0
 // get full filename path and strip out Debug or Release and 64-bit builds
 static const char* fullpath(const char* filename)
 {
@@ -37,6 +38,7 @@ static const char* fullpath(const char* filename)
 
 	return full;
 };
+#endif // 0
 
 #define SQLITE_OPEN "https://www.sqlite.org/c3ref/c_open_autoproxy.html"
 
@@ -53,6 +55,35 @@ XLL_CONST(LONG, SQLITE_OPEN_EXRESCODE, SQLITE_OPEN_EXRESCODE, "The database conn
 XLL_CONST(LONG, SQLITE_OPEN_NOFOLLOW, SQLITE_OPEN_NOFOLLOW, "The database filename is not allowed to be a symbolic link", CATEGORY " Enum", SQLITE_OPEN);
 
 #undef SQLITE_OPEN
+
+AddIn xai_cwd(
+	Function(XLL_CSTRING12, "xll_cwd", "SYS.CWD")
+	.Arguments({
+		Arg(XLL_CSTRING12, "dir", "is the directory to change to or missing.")}
+		)
+	.Category("SYS")
+	.FunctionHelp("Get or change the current working directory.")
+	.HelpTopic("https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/getcwd-wgetcwd?view=msvc-160")
+);
+wchar_t* WINAPI xll_cwd(wchar_t* dir)
+{
+#pragma XLLEXPORT
+	static wchar_t cwd[MAX_PATH];
+
+	cwd[0] = 0;
+	if (*dir) {
+		if (0 != _wchdir(dir)) {
+			XLL_ERROR(__FUNCTION__ ": could not change to directory");
+		}
+	}
+	else {
+		if (nullptr == _wgetcwd(cwd, MAX_PATH)) {
+			XLL_ERROR(__FUNCTION__ ": could not get current working directory");
+		}
+	}
+
+	return cwd;
+}
 
 AddIn xai_sqlite_db(
 	Function(XLL_HANDLEX, "xll_sqlite_db", "\\" CATEGORY ".DB")
@@ -73,9 +104,8 @@ HANDLEX WINAPI xll_sqlite_db(const char* filename, LONG flags)
 	HANDLEX result = INVALID_HANDLEX;
 
 	try {
-		handle<sqlite::db> h(new sqlite::db(*filename ? fullpath(filename) : "", flags));
+		handle<sqlite::db> h(new sqlite::db(filename, flags));
 		ensure(h);
-		
 		result = h.get();
 	}
 	catch (const std::exception& ex) {
