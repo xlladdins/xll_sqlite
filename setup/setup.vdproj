@@ -144,17 +144,6 @@
             "Property" = "8:TARGETDIR"
                 "Folders"
                 {
-                    "{9EF0B969-E518-4E46-987F-47570745A589}:_D2B1E1AFEEDD418898C6CA8680235CEC"
-                    {
-                    "Name" = "8:db"
-                    "AlwaysCreate" = "11:FALSE"
-                    "Condition" = "8:"
-                    "Transitive" = "11:FALSE"
-                    "Property" = "8:_0C5293A36FA44F9F98F985CF4A3D3066"
-                        "Folders"
-                        {
-                        }
-                    }
                 }
             }
         }
@@ -174,7 +163,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:xll_sqlite"
         "ProductCode" = "8:{061C8192-32CD-48FF-86E5-4CCE9F958856}"
-        "PackageCode" = "8:{3B834262-284D-4906-BBD3-A434034498A0}"
+        "PackageCode" = "8:{9773382D-8030-42B9-A9C5-83F36767CCDF}"
         "UpgradeCode" = "8:{2DFAB58B-8609-4603-8972-96266044CD48}"
         "AspNetVersion" = "8:2.0.50727.0"
         "RestartWWWService" = "11:FALSE"
