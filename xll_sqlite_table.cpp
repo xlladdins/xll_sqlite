@@ -95,11 +95,21 @@ HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const LPOP
 		}
 		sql.append(")");
 
+		sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
+
 		sqlite::stmt stmt(*db_);
 		stmt.prepare(sql);
-		xll::iterable<XLOPER12> i(o);
-		xll::copy(i, stmt);
-	/*
+		
+		try {
+			xll::iterable<XLOPER12> i(o);
+			xll::copy(i, stmt);
+			sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
+		}
+		catch (const std::exception& ex) {
+			sqlite3_exec(*db_, "ROLLBACK TRANSACTION", NULL, NULL, NULL);
+			XLL_ERROR(ex.what());
+		}
+		/*
 		if (o.size() == 1 && o.is_num()) {
 			handle<sqlite::cursor> cur_(o.as_num());
 			ensure(cur_);
@@ -211,12 +221,17 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 			sql.append(")");
 			stmt.prepare(sql);
 
-			//sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
+			sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
 	
-			xll::iterable i(*pdata, row);
-			copy(i, stmt);
-
-			//sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
+			try {
+				xll::iterable i(*pdata, row);
+				copy(i, stmt);
+				sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
+			}
+			catch (const std::exception& ex) {
+				sqlite3_exec(*db_, "ROLLBACK TRANSACTION", NULL, NULL, NULL);
+				XLL_ERROR(ex.what());
+			}
 		}
 
 	}

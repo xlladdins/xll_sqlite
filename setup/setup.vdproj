@@ -15,18 +15,6 @@
     {
         "Entry"
         {
-        "MsmKey" = "8:_293A8178132345FEBA03DDBF1493584A"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_57D1257A3571480AA88361847CD4A6C3"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_8D4E3E6BA88644C4829EA855D973F9CE"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -118,46 +106,6 @@
         }
         "File"
         {
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_293A8178132345FEBA03DDBF1493584A"
-            {
-            "SourcePath" = "8:..\\Rules.xlsx"
-            "TargetName" = "8:Rules.xlsx"
-            "Tag" = "8:"
-            "Folder" = "8:_7C6DEED858A04E2B85B28DAB75D7C95C"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
-            "IsolateTo" = "8:"
-            }
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_57D1257A3571480AA88361847CD4A6C3"
-            {
-            "SourcePath" = "8:..\\db\\tmswap.db"
-            "TargetName" = "8:tmswap.db"
-            "Tag" = "8:"
-            "Folder" = "8:_D2B1E1AFEEDD418898C6CA8680235CEC"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
-            "IsolateTo" = "8:"
-            }
         }
         "FileType"
         {
@@ -196,17 +144,6 @@
             "Property" = "8:TARGETDIR"
                 "Folders"
                 {
-                    "{9EF0B969-E518-4E46-987F-47570745A589}:_D2B1E1AFEEDD418898C6CA8680235CEC"
-                    {
-                    "Name" = "8:db"
-                    "AlwaysCreate" = "11:FALSE"
-                    "Condition" = "8:"
-                    "Transitive" = "11:FALSE"
-                    "Property" = "8:_0C5293A36FA44F9F98F985CF4A3D3066"
-                        "Folders"
-                        {
-                        }
-                    }
                 }
             }
         }
@@ -226,7 +163,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:xll_sqlite"
         "ProductCode" = "8:{061C8192-32CD-48FF-86E5-4CCE9F958856}"
-        "PackageCode" = "8:{3B834262-284D-4906-BBD3-A434034498A0}"
+        "PackageCode" = "8:{9773382D-8030-42B9-A9C5-83F36767CCDF}"
         "UpgradeCode" = "8:{2DFAB58B-8609-4603-8972-96266044CD48}"
         "AspNetVersion" = "8:2.0.50727.0"
         "RestartWWWService" = "11:FALSE"
@@ -747,7 +684,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_8D4E3E6BA88644C4829EA855D973F9CE"
             {
-            "SourcePath" = "8:..\\x64\\Debug\\xll_sqlite.xll"
+            "SourcePath" = "8:..\\x64\\Release\\xll_sqlite.xll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_7C6DEED858A04E2B85B28DAB75D7C95C"
