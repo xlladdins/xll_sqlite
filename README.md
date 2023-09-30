@@ -50,6 +50,10 @@ The new table will contain the result of executing the statement.
 
 ## Example
 ```C++
+#include "fms_sqlite.h"
+...
+	sqlite::db db(""); // in-memory database
+
 	sqlite::stmt stmt(::db);
 	stmt.exec("DROP TABLE IF EXISTS t");
 	stmt.exec("CREATE TABLE t (a INT, b FLOAT, c TEXT)");
