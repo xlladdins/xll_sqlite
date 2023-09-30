@@ -34,7 +34,7 @@ Statements are executed with [`=SQL.EXEC(stmt)`](https://www.sqlite.org/c3ref/ex
 Sqlite tables are created using 
 [`=SQL.CREATE_TABLE(db, name, data, columns, types)`](https://www.sqlite.org/lang_createtable.html).
 The the `columns` and `types` are used for the schema in `CREATE TABLE` and `data`
-are `INSERT INTO` to the table. If `data` is missing then the table is created.
+are `INSERT INTO` to the table. If `data` is missing then the table is created with 0 rows.
 
 If `columns` are not specified then the first row of `data` is used for column names. 
 The allowed `_types` are those specified
@@ -48,6 +48,28 @@ It is also possible to create tables from a query using
 [`=SQL.CREATE_TABLE_AS(db, name, stmt)`](https://www.sqlite.org/lang_createtable.html).
 The new table will contain the result of executing the statement.
 
+## Example
+```C++
+	sqlite::stmt stmt(::db);
+	stmt.exec("DROP TABLE IF EXISTS t");
+	stmt.exec("CREATE TABLE t (a INT, b FLOAT, c TEXT)");
+
+	stmt.prepare("INSERT INTO t VALUES (?, ?, :c)");
+	stmt[0] = 123; // calls sqlite3_bind_int(stmt, 0 + 1, 123);
+	stmt[1] = 1.23;
+	stmt[":c"] = "str"; // bind parameter name
+
+	assert(SQLITE_DONE == stmt.step());
+
+	stmt.prepare("SELECT * FROM t");
+	stmt.step();
+	assert(stmt[0] == 123);
+	assert(stmt["b"] == 1.23); // lookup by name
+	assert(stmt[2] == "str");
+
+	assert(SQLITE_DONE == stmt.step());
+
+```
 ## FAQ
 
 <dl>
