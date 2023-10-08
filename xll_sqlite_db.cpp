@@ -4,6 +4,11 @@
 
 using namespace xll;
 
+#ifdef _DEBUG
+Auto<Open> xao_test_is_str_date(test_is_str_date);
+Auto<Open> xao_test_guess_one_sqlite_type(test_guess_one_sqlite_type);
+#endif // _DEBUG
+
 #if 0
 // get full filename path and strip out Debug or Release and 64-bit builds
 static const char* fullpath(const char* filename)

@@ -50,19 +50,20 @@ const char* common_type(const char* a, const char* b)
 #endif // 0
 
 AddIn xai_sqlite_types(
-	Function(XLL_LPOPER, "xll_sqlite_types", CATEGORY ".TYPES")
+	Function(XLL_LPOPER, "xll_sqlite_types", CATEGORY ".TYPE")
 	.Arguments({
 		Arg(XLL_LPOPER, "range", "is a range."),
+		Arg(XLL_LONG, "column", "is the range column to check."),
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Guess sqlite types of columns.")
 );
-LPOPER WINAPI xll_sqlite_types(const LPOPER po)
+LPOPER WINAPI xll_sqlite_types(const LPOPER po, long column)
 {
 #pragma XLLEXPORT
 	static OPER o;
 
-	int type = guess_sqltype(*po);
+	int type = guess_sqltype(*po, column);
 	o = sqlite::sqlname(type);
 
 	return &o;
@@ -163,7 +164,7 @@ inline std::string create_table(const OPER& data, OPER columns, OPER types)
 
 	for (unsigned j = 0; j < data.columns(); ++j) {
 		columns[j] = columns[j] ? columns[j] : data(0, j); // first row has column names
-		types[j] = types[j] ? types[j] : sqlite::sqlname(guess_sqltype(data(1, j)));
+		types[j] = types[j] ? types[j] : sqlite::sqlname(guess_sqltype(data, j));
 	}
 
 	return create_table(columns, types);

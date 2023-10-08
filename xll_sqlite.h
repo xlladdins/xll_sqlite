@@ -32,6 +32,7 @@ X(xltypeNum,     SQLITE_FLOAT,   "FLOAT")   \
 X(xltypeStr,     SQLITE_TEXT,    "TEXT")    \
 X(xltypeBigData, SQLITE_BLOB,    "BLOB")    \
 X(xltypeNil,     SQLITE_NULL,    "NULL")    \
+X(xltypeErr,     SQLITE_NULL,    "NULL")    \
 
 namespace xll {
 
@@ -47,9 +48,7 @@ namespace xll {
 	inline constexpr int sqltype(int xltype)
 	{
 		for (auto [x, s] : xl_sql_type) {
-#define XS_TYPE(a, b, c) if (xltype == x) return s;
-			XLL_SQLITE_TYPE(XS_TYPE)
-#undef XS_TYPE
+			if (xltype == x) return s;
 		}
 		return SQLITE_UNKNOWN;
 	}
@@ -58,9 +57,7 @@ namespace xll {
 	inline constexpr int xltype(int sqltype)
 	{
 		for (auto [x, s] : xl_sql_type) {
-#define SX_TYPE(a, b, c) if (sqltype == s) return x;
-			XLL_SQLITE_TYPE(SX_TYPE)
-#undef SX_TYPE
+			if (sqltype == s) return x;
 		}
 		return xltypeErr;
 	}
@@ -112,9 +109,9 @@ namespace xll {
 	template<class X>
 	inline bool possibly_num_date(const XOPER<X>& x)
 	{
-		static const double _1970 = 25569.00;
-		static const double _3000 = 401769.00;
-		
+		static const double _1970 = 25569;
+		static const double _3000 = 401769;
+
 		return (x.type() == xltypeNum) and _1970 <= x.val.num and x.val.num <= _3000;
 	}
 
@@ -132,12 +129,49 @@ namespace xll {
 
 		return fms::parse_tm(vdt, ptm);
 	}
+#ifdef _DEBUG
+	inline int test_is_str_date() {
+		try {
+			tm tm;
+			ensure(is_str_date(OPER("1970-1-1"), &tm));
+			ensure(is_str_date(OPER("1970/1/1"), &tm));
+			ensure(!is_str_date(OPER("1970-1/1"), &tm));
+			ensure(!is_str_date(OPER("1970/1-1"), &tm));
+			ensure(is_str_date(OPER("1970/1/1"), &tm));
+			ensure(is_str_date(OPER("1970-1-1T00:00:00.0"), &tm));
+			ensure(is_str_date(OPER("1970-1-1 00:00:00"), &tm));
+			ensure(is_str_date(OPER("1970-1-1 00:00:00.000"), &tm));
+			ensure(is_str_date(OPER("1970-1-1 00:00:00.000000"), &tm));
+			ensure(is_str_date(OPER("1970-1-1 00:00:00.000000000"), &tm));
+			ensure(is_str_date(OPER("1970-1-1 00:00:00.0"), &tm));
+			ensure(!is_str_date(OPER("1-1-1"), &tm));
+		}
+		catch (const std::exception& ex) {
+			XLL_ERROR(ex.what());
+
+			return FALSE;
+		}
+
+		return TRUE;
+	}
+#endif // _DEBUG
 
 	// bool < int < float < text
 	template<class X>
 	inline int guess_one_sqltype(const XOPER<X>& x)
 	{
-		if (!x) return SQLITE_NULL;
+		ensure(x.size() <= 1);
+
+		if (x.is_num()) {
+			if (x.as_num() == (int)x.as_num()) {
+				return SQLITE_INTEGER;
+			}
+			else {
+				return possibly_num_date(x) ? SQLITE_DATETIME : SQLITE_FLOAT;
+			}
+		}
+
+		if (x.is_bool()) return SQLITE_BOOLEAN;
 
 		if (x.type() == xltypeStr) {
 			if (x.val.str[0] == 0) {
@@ -152,57 +186,59 @@ namespace xll {
 			}
 		}
 
-		if (possibly_num_date(x)) {
-			return SQLITE_DATETIME;
-		}
+		if (!x) return SQLITE_NULL;
 
 		return sqltype(x.type());
 	}
-
-	template<class X>
-	inline int guess_sqltype(const XOPER<X>& x)
+#ifdef _DEBUG
+	inline int test_guess_one_sqlite_type()
 	{
-		int type = guess_one_sqltype(x[0u]);
-		bool isdate = type == SQLITE_DATETIME;
-		bool notdate = !isdate;
+		try {
+			ensure(SQLITE_FLOAT == guess_one_sqltype(OPER(1.23)));
+			ensure(SQLITE_INTEGER == guess_one_sqltype(OPER(123)));
+			ensure(SQLITE_BOOLEAN == guess_one_sqltype(OPER(true)));
+			ensure(SQLITE_NULL == guess_one_sqltype(OPER()));
+			ensure(SQLITE_NULL == guess_one_sqltype(OPER("")));
+			ensure(SQLITE_TEXT == guess_one_sqltype(OPER(" ")));
+			ensure(SQLITE_DATETIME == guess_one_sqltype(OPER("1970-1-1")));
+			ensure(SQLITE_NULL == guess_one_sqltype((OPER)ErrNA));
+		}
+		catch (const std::exception& ex) {
+			XLL_ERROR(ex.what());
 
-		if (x[0u].is_str() and isdate) {
-			return type; // override all other types
+			return FALSE;
+		}	
+
+		return TRUE;
+	}
+#endif // _DEBUG
+	template<class X>
+	inline int guess_sqltype(const XOPER<X>& x, unsigned col, unsigned rows = -1)
+	{
+		ensure(col < x.columns());
+
+		std::set<int> types;
+		if (rows == -1) {
+			rows = x.rows();
+		}
+		for (unsigned i = 0; i < rows; ++i) {
+			types.insert(guess_one_sqltype(x(i, col)));
 		}
 
-		for (unsigned i = 1; i < x.size(); ++i) {
-			int ti = guess_one_sqltype(x[i]);
-
-			if (ti == SQLITE_NULL) {
-				continue;
-			}
-
-			if (type != ti) {
-				if (type == SQLITE_BOOLEAN) {
-					type = ti;
-					notdate |= true;
-				}
-				if (type == SQLITE_INTEGER) {
-					type = ti;
-					notdate |= true;
-				}
-				if (ti == SQLITE_FLOAT) {
-					type = ti;
-					if (possibly_num_date(x[i])) {
-						isdate |= true;
-					}
-					else {
-						notdate |= true;
-					}
-				}
-				if (ti == SQLITE_DATETIME) {
-					type = ti;
-					isdate |= true;
-				}
-			}
+		if (types.size() == 1) {
+			return *types.begin();
+		}
+		if (types.contains(SQLITE_TEXT)) {
+			return SQLITE_TEXT;
+		}
+		if (types.contains(SQLITE_FLOAT)) {
+			return SQLITE_FLOAT;
+		}
+		if (types.contains(SQLITE_INTEGER)) {
+			return SQLITE_INTEGER;
 		}
 
-		return (isdate or !notdate) ? SQLITE_DATETIME : type;
+		return guess_one_sqltype(x[col]);
 	}
 
 	template<class X>
@@ -228,7 +264,7 @@ namespace xll {
 				stmt.bind(j, string_view(x));
 			}
 		}
-			break;
+					  break;
 		case xltypeBool:
 			stmt.bind(j, x.val.xbool != 0);
 			break;
@@ -249,7 +285,7 @@ namespace xll {
 			auto str = v.as_text();
 			return XOPER<X>(str.data(), (int)str.size());
 		}
-			//case SQLITE_BLOB:
+						//case SQLITE_BLOB:
 		case SQLITE_BOOLEAN:
 			return XOPER<X>(v.as_boolean());
 		case SQLITE_DATETIME: {
@@ -280,7 +316,7 @@ namespace xll {
 		}
 		case SQLITE_NULL:
 			return XOPER<X>("");
-		default: 
+		default:
 			return XOPER<X>(XOPER<X>::Err::NA);
 		}
 	}
@@ -298,7 +334,7 @@ namespace xll {
 	{
 		using X = typename O::value_type;
 		sqlite::map(stmt, std::back_inserter(o), as_oper<X>);
-		
+
 		auto c = stmt.column_count();
 		if (c != 0) {
 			ensure(0 == o.size() % c);
@@ -447,7 +483,7 @@ namespace xll {
 		return i;
 	}
 
-	/* !!! 
+	/* !!!
 	template<class X>
 	inline void bind(sqlite3_stmt* stmt, int i, const XOPER<X>& o, int type = 0)
 	{

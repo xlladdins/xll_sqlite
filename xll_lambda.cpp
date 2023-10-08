@@ -56,7 +56,7 @@ int WINAPI xll_define_lambda()
 	return TRUE;
 }
 // similar to Ctrl-Shift-F3
-Auto <OpenAfter> xaoa_define_lambds([]() {
+Auto <OpenAfter> xaoa_define_lambda([]() {
 	Excel(xlcOnKey, OPER(ON_CTRL ON_ALT ON_F3), OPER("XLL.DEFINE.LAMBDA"));
 	return TRUE;
 });
