@@ -149,8 +149,10 @@ inline std::string create_table(const OPER& columns, const OPER& types)
 }
 inline std::string create_table(const OPER& data, OPER columns, OPER types)
 {
+	unsigned off = 0;
 	if (columns.is_missing()) {
 		columns.resize(1, data.columns());
+		off = 1;
 	}
 	else {
 		ensure(data.columns() == columns.size());
@@ -164,7 +166,10 @@ inline std::string create_table(const OPER& data, OPER columns, OPER types)
 
 	for (unsigned j = 0; j < data.columns(); ++j) {
 		columns[j] = columns[j] ? columns[j] : data(0, j); // first row has column names
-		types[j] = types[j] ? types[j] : sqlite::sqlname(guess_sqltype(data, j));
+		if (columns[j].val.str[0] != 0 && columns[j].val.str[1] != '[') {
+			columns[j] = OPER("[") & columns[j] & OPER("]");
+		}
+		types[j] = types[j] ? types[j] : sqlite::sqlname(guess_sqltype(data, j, data.rows() - off, off));
 	}
 
 	return create_table(columns, types);

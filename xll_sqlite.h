@@ -163,11 +163,14 @@ namespace xll {
 		ensure(x.size() <= 1);
 
 		if (x.is_num()) {
-			if (x.as_num() == (int)x.as_num()) {
+			if (possibly_num_date(x)) {
+				return SQLITE_DATETIME;
+			}
+			else if (x.as_num() == (int)x.as_num()) {
 				return SQLITE_INTEGER;
 			}
 			else {
-				return possibly_num_date(x) ? SQLITE_DATETIME : SQLITE_FLOAT;
+				return SQLITE_FLOAT;
 			}
 		}
 
@@ -213,7 +216,7 @@ namespace xll {
 	}
 #endif // _DEBUG
 	template<class X>
-	inline int guess_sqltype(const XOPER<X>& x, unsigned col, unsigned rows = -1)
+	inline int guess_sqltype(const XOPER<X>& x, unsigned col, unsigned rows = -1, unsigned off = 0)
 	{
 		ensure(col < x.columns());
 
@@ -221,24 +224,33 @@ namespace xll {
 		if (rows == -1) {
 			rows = x.rows();
 		}
-		for (unsigned i = 0; i < rows; ++i) {
-			types.insert(guess_one_sqltype(x(i, col)));
+		for (unsigned i = off; i + off < rows; ++i) {
+			auto ti = guess_one_sqltype(x(i, col));
+			ensure(ti != SQLITE_UNKNOWN);
+			if (ti != SQLITE_NULL) {
+				types.insert(ti);
+			}
 		}
 
-		if (types.size() == 1) {
-			return *types.begin();
+		if (types.size() == 0) {
+			return SQLITE_NULL;
 		}
-		if (types.contains(SQLITE_TEXT)) {
-			return SQLITE_TEXT;
-		}
-		if (types.contains(SQLITE_FLOAT)) {
-			return SQLITE_FLOAT;
-		}
-		if (types.contains(SQLITE_INTEGER)) {
-			return SQLITE_INTEGER;
+		if (types.size() > 1) {
+			if (types.contains(SQLITE_TEXT)) {
+				return SQLITE_TEXT;
+			}
+			if (types.contains(SQLITE_FLOAT)) {
+				return SQLITE_FLOAT;
+			}
+			if (types.contains(SQLITE_INTEGER)) {
+				return SQLITE_INTEGER;
+			}
+			if (types.contains(SQLITE_BOOLEAN)) {
+				return SQLITE_BOOLEAN;
+			}
 		}
 
-		return guess_one_sqltype(x[col]);
+		return *types.begin();
 	}
 
 	template<class X>
