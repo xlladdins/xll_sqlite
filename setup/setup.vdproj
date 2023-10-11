@@ -162,15 +162,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:xll_sqlite"
-        "ProductCode" = "8:{B3CD1963-9E60-4776-B9E5-B47C654C9A41}"
-        "PackageCode" = "8:{88D73CE3-16DB-4A24-AB4C-3D94D9FE91C3}"
+        "ProductCode" = "8:{FBBFAF8E-0BDE-44D2-95A0-7B3A2624D9AB}"
+        "PackageCode" = "8:{ACD47A13-20CE-4596-9E45-7DB4584C02EF}"
         "UpgradeCode" = "8:{2DFAB58B-8609-4603-8972-96266044CD48}"
         "AspNetVersion" = "8:2.0.50727.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:FALSE"
-        "ProductVersion" = "8:1.0.1"
+        "ProductVersion" = "8:1.0.2"
         "Manufacturer" = "8:kal@kalx.net"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
@@ -684,7 +684,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_8D4E3E6BA88644C4829EA855D973F9CE"
             {
-            "SourcePath" = "8:..\\x64\\Debug\\xll_sqlite.xll"
+            "SourcePath" = "8:..\\x64\\Release\\xll_sqlite.xll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_7C6DEED858A04E2B85B28DAB75D7C95C"

@@ -5,50 +5,6 @@
 
 using namespace xll;
 
-#if 0
-const char* common_type(const char* a, const char* b)
-{
-	int ta = sqlite::type(a);
-	int tb = sqlite::type(b);
-
-	if (ta == tb) {
-		return a;
-	}
-
-	switch (ta) {
-	case SQLITE_INTEGER:
-		switch (tb) {
-		case SQLITE_FLOAT:
-			return b;
-		case SQLITE_TEXT:
-			return b;
-		case SQLITE_DATETIME:
-			return b;
-		default:
-			return a;
-		}
-	case SQLITE_FLOAT:
-		switch (tb) {
-		case SQLITE_TEXT:
-			return b;
-		case SQLITE_DATETIME:
-			return b;
-		default:
-			return a;
-		}
-	case SQLITE_TEXT:
-		switch (tb) {
-		case SQLITE_DATETIME:
-			return b;
-		default:
-			return a;
-		}
-	}
-
-	return a;
-}
-#endif // 0
-
 AddIn xai_sqlite_types(
 	Function(XLL_LPOPER, "xll_sqlite_types", CATEGORY ".TYPE")
 	.Arguments({
@@ -110,15 +66,6 @@ HANDLEX WINAPI xll_sqlite_insert_table(HANDLEX db, const char* table, const LPOP
 			sqlite3_exec(*db_, "ROLLBACK TRANSACTION", NULL, NULL, NULL);
 			XLL_ERROR(ex.what());
 		}
-		/*
-		if (o.size() == 1 && o.is_num()) {
-			handle<sqlite::cursor> cur_(o.as_num());
-			ensure(cur_);
-			//sqlite::insert(*db_, table + 1, table[0], *cur_);
-		}
-		else {
-		*/
-		/*}*/
 	}
 	catch (const std::exception& ex) {
 		XLL_ERROR(ex.what());
