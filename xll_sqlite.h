@@ -21,7 +21,6 @@ inline const auto Arg_db = xll::Arg(XLL_HANDLEX, "db", "is a handle to a sqlite 
 inline const auto Arg_stmt = xll::Arg(XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
 inline const auto Arg_sql = xll::Arg(XLL_LPOPER, "sql", "is a SQL query to execute.");
 inline const auto Arg_bind = xll::Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
-inline const auto Arg_nh = xll::Arg(XLL_BOOL, "no_headers", "is a optional boolean value indicating not to return headers. Default is FALSE.");
 inline const auto Arg_table = xll::Arg(XLL_LPOPER4, "name", "the name of a table.");
 
 // xltype to sqlite type
@@ -210,7 +209,7 @@ namespace xll {
 			XLL_ERROR(ex.what());
 
 			return FALSE;
-		}	
+		}
 
 		return TRUE;
 	}
@@ -253,38 +252,117 @@ namespace xll {
 		return *types.begin();
 	}
 
+	// 1-based
 	template<class X>
-	inline void bind(sqlite::stmt& stmt, int j, const X& x)
+	inline int bind_parameter_index(sqlite3_stmt* stmt, const XOPER<X>& o)
 	{
-		switch (type(x)) {
-		case xltypeNum:
-			stmt.bind(j, x.val.num);
+		int i = 0; // not found
+
+		if (o.is_num()) {
+			i = o.as_int();
+		}
+		else if (o.is_str()) {
+			i = sqlite3_bind_parameter_index(stmt, to_string(o).c_str());
+		}
+		else {
+			ensure(!__FUNCTION__ ": index must be integer or string");
+		}
+
+		return i;
+	}
+
+	// Bind OPER to 1-based SQLite statement column j base on sqlite extended type tj.
+	template<class X>
+	inline void bind(sqlite::stmt& stmt, int j, const X& _x, int tj = 0)
+	{
+		const OPER& x(_x);
+		if (!x) {
+			stmt.bind(j); // NULL
+		
+			return;
+		}
+
+		if (!tj) {
+			tj = stmt.sqltype(j); /// extended SQLite type
+		}
+
+		switch (tj) {
+		case SQLITE_FLOAT:
+			stmt.bind(j, x.as_num());
 			break;
-		case xltypeInt:
-			stmt.bind(j, x.val.w);
+		case SQLITE_INTEGER:
+			stmt.bind(j, x.as_int());
 			break;
-		case xltypeStr: {
-			tm tm;
-			auto sv = xll::view(x);
-			if (0 == sv.len) {
-				stmt.bind(j);
-			}
-			if (fms::parse_tm(sv, &tm)) {
-				stmt.bind(j, _mkgmtime(&tm));
-			}
-			else {
+		case SQLITE_BOOLEAN:
+			stmt.bind(j, x.as_int() != 0);
+			break;
+		case SQLITE_TEXT:
+			if (x.is_str()) {
 				stmt.bind(j, string_view(x));
 			}
-		}
-					  break;
-		case xltypeBool:
-			stmt.bind(j, x.val.xbool != 0);
+			else {
+				stmt.bind(j, to_string(x));
+			}
 			break;
+		case SQLITE_DATETIME:
+		{
+			if (x.is_num()) {
+				if (possibly_num_date(x)) {
+					stmt.bind(j, to_time_t(x.val.num));
+					break;
+				}
+				else {
+					stmt.bind(j, x.as_num()); // SQLITE_FLOAT
+					break;
+				}
+				break;
+			}
+			else if (x.is_str()) {
+				auto sv = xll::view(x);
+				struct tm tm;
+				if (fms::parse_tm(sv, &tm)) {
+					stmt.bind(j, _mkgmtime(&tm));
+				}
+				else {
+					std::string err(__FUNCTION__ ": invalid date string: ");
+					const auto esv = sv.error_msg();
+					OPER e(esv.buf, esv.len > 10 ? 10 : esv.len);
+					err.append(e.to_string());
+
+					throw std::runtime_error(err.c_str());
+				}
+			}
+			else {
+				ensure(!__FUNCTION__ ": date must be number or string");
+			}
+		}
+		break;
 		default:
-			stmt.bind(j);
+			stmt.bind(j); // NULL
 		}
 	}
 
+	// Bind keys to values. 
+	inline void sqlite_bind(sqlite::stmt& stmt, const OPER4& key, const OPER4& val)
+	{
+		size_t n = key.size();
+		ensure(val.size() == n);
+
+		for (unsigned i = 0; i < n; ++i) {
+			int pi = 1 + i; // bind position
+			if (key[i].is_str()) {
+				const auto ki = key[i].to_string();
+				pi = stmt.bind_parameter_index(ki.c_str());
+				if (!pi) {
+					XLL_ERROR((std::string(__FUNCTION__) + ": parameter index not found: " + ki).c_str());
+				}
+			}
+
+			bind(stmt, pi, val[i]);
+		}
+	}
+
+	// Convert SQLite value to OPER.
 	template<class X>
 	inline auto as_oper(const sqlite::value& v)
 	{
@@ -294,10 +372,10 @@ namespace xll {
 		case SQLITE_FLOAT:
 			return XOPER<X>(v.as_float());
 		case SQLITE_TEXT: {
-			auto str = v.as_text();
+			const auto str = v.as_text();
 			return XOPER<X>(str.data(), (int)str.size());
 		}
-						//case SQLITE_BLOB:
+		//case SQLITE_BLOB:
 		case SQLITE_BOOLEAN:
 			return XOPER<X>(v.as_boolean());
 		case SQLITE_DATETIME: {
@@ -476,25 +554,6 @@ namespace xll {
 		}
 	}
 
-	// 1-based
-	template<class X>
-	inline int bind_parameter_index(sqlite3_stmt* stmt, const XOPER<X>& o)
-	{
-		int i = 0; // not found
-
-		if (o.is_num()) {
-			i = o.as_int();
-		}
-		else if (o.is_str()) {
-			i = sqlite3_bind_parameter_index(stmt, to_string(o).c_str());
-		}
-		else {
-			ensure(!__FUNCTION__ ": index must be integer or string");
-		}
-
-		return i;
-	}
-
 	/* !!!
 	template<class X>
 	inline void bind(sqlite3_stmt* stmt, int i, const XOPER<X>& o, int type = 0)
@@ -536,79 +595,6 @@ namespace xll {
 		ensure(!__FUNCTION__ ": invalid type");
 	}
 	*/
-	inline void sqlite_bind(sqlite::stmt& stmt, const OPER4& val, sqlite3_destructor_type del = SQLITE_TRANSIENT)
-	{
-		size_t n = val.columns() == 2 ? val.rows() : val.size();
-
-		for (unsigned i = 0; i < n; ++i) {
-			unsigned pi = i + 1; // bind position
-			if (val.columns() == 2) {
-				if (!val(i, 0)) {
-					continue;
-				}
-				std::string name = to_string(val(i, 0));
-				// check sql string for ':', '@', or '$'?
-				if (!::strchr(":@$", name[0])) {
-					name.insert(0, 1, ':');
-				}
-				pi = stmt.bind_parameter_index(name.c_str());
-				if (!pi) {
-					XLL_WARNING((name + ": not found").c_str());
-				}
-			}
-			else if (!val[i]) {
-				continue;
-			}
-
-			const OPER4& vali = pi ? val(i, 1) : val[i];
-			if (vali.is_num()) {
-				stmt.bind(pi, vali.val.num);
-			}
-			else if (vali.is_str()) {
-				stmt.bind(pi, std::string_view(vali.val.str + 1, vali.val.str[0]), del);
-			}
-			else if (vali.is_nil()) {
-				stmt.bind(pi);
-			}
-			else if (vali.is_bool()) {
-				stmt.bind(pi, vali.val.xbool);
-			}
-			else {
-				ensure(!__FUNCTION__ ": value to bind must be number, string, or null");
-			}
-		}
-	}
-	// Bind keys to values. Size is determined by key array. 
-	inline void sqlite_bind(sqlite::stmt& stmt, const OPER4& key, const OPER4& val)
-	{
-		size_t n = key.size();
-		ensure(val.size() >= n);
-
-		for (unsigned i = 0; i < n; ++i) {
-			const auto ki = key[i].to_string();
-			int pi = stmt.bind_parameter_index(ki.c_str());
-			if (!pi) {
-				XLL_WARNING((ki + ": not found").c_str());
-			}
-
-			const OPER4& vi = val[i];
-			if (vi.is_str()) {
-				stmt.bind(pi, std::string_view(vi.val.str + 1, vi.val.str[0]));
-			}
-			else if (vi.is_num()) {
-				stmt.bind(pi, vi.val.num);
-			}
-			else if (vi.is_nil()) {
-				stmt.bind(pi);
-			}
-			else if (vi.is_bool()) {
-				stmt.bind(pi, vi.val.xbool);
-			}
-			else {
-				ensure(!__FUNCTION__ ": value to bind must be number, string, or null");
-			}
-		}
-	}
 	/*
 	inline OPER sqlite_exec(sqlite::stmt& stmt, bool no_headers)
 	{

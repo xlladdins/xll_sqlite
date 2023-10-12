@@ -84,16 +84,15 @@ inline std::string create_table(const OPER& columns, const OPER& types)
 	for (unsigned j = 0; j < columns.size(); ++j) {
 		ct.append(comma);
 		ct.append(columns[j] ? columns[j].to_string() : (OPER("col") & OPER(j)).to_string());
-		if (!types.is_missing()) {
-			ct.append(" ");
-			ct.append(types[j].to_string());
-		}
+		ct.append(" ");
+		ct.append(sqlite::sqlname(types[j].as_int()));
 		comma = ", ";
 	}
 	ct.append(")");
 
 	return ct;
 }
+/*
 inline std::string create_table(const OPER& data, OPER columns, OPER types)
 {
 	unsigned off = 0;
@@ -121,7 +120,7 @@ inline std::string create_table(const OPER& data, OPER columns, OPER types)
 
 	return create_table(columns, types);
 }
-
+*/
 AddIn xai_sqlite_create_table(
 	Function(XLL_HANDLEX, "xll_sqlite_create_table", CATEGORY ".CREATE_TABLE")
 	.Arguments({
@@ -143,22 +142,33 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 		ensure(db_);
 
 		const OPER& data = *pdata;
-		OPER column(1, data.columns());
-		OPER type(1, data.columns());
+		OPER column = *pcolumns;
+		OPER type = *ptypes;
 		unsigned row = 0; // first row of data
 
 		if (pcolumns->is_missing()) {
 			row = 1; // first row has column names
+			column.resize(1, data.columns());
+			for (unsigned j = 0; j < data.columns(); ++j) {
+				column[j] = data(0, j);
+			}
+		}
+		for (unsigned j = 0; j < column.size(); ++j) {
+			if (column[j].val.str[0] != 0 && column[j].val.str[1] != '[') {
+				column[j] = OPER("[") & column[j] & OPER("]");
+			}
+		}
+
+		if (ptypes->is_missing()) {
+			type.resize(1, data.columns());
+			for (unsigned j = 0; j < data.columns(); ++j) {
+				type[j] = guess_sqltype(data, j, data.rows() - row, row);
+			}
 		}
 
 		auto ct = std::string("CREATE TABLE ")
 			+ sqlite::table_name(table);
-		if (pdata->is_missing()) {
-			ct.append(create_table(*pcolumns, *ptypes));
-		}
-		else {
-			ct.append(create_table(*pdata, *pcolumns, *ptypes));
-		}
+		ct.append(create_table(column, type));
 
 		sqlite::stmt stmt(*db_);
 		stmt.exec(std::string("DROP TABLE IF EXISTS ") + sqlite::table_name(table));
@@ -177,8 +187,15 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 			sqlite3_exec(*db_, "BEGIN TRANSACTION", NULL, NULL, NULL);
 	
 			try {
-				xll::iterable i(*pdata, row);
-				copy(i, stmt);
+				for (unsigned i = row; i < pdata->rows(); ++i) {
+					for (unsigned j = 0; j < pdata->columns(); ++j) {
+						int tt;
+						tt = stmt.sqltype(j + 1);
+						bind(stmt, j + 1, (*pdata)(i, j), type[j].as_int());
+					}
+					stmt.step();
+					stmt.reset();
+				}
 				sqlite3_exec(*db_, "COMMIT TRANSACTION", NULL, NULL, NULL);
 			}
 			catch (const std::exception& ex) {

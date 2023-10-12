@@ -313,12 +313,7 @@ HANDLEX WINAPI xll_sqlite_stmt_bind(HANDLEX stmt, const LPOPER4 pkey, const LPOP
 
 		//stmt_->reset();
 		//stmt_->clear_bindings();
-		if (pval->is_missing()) {
-			sqlite_bind(*stmt_, *pkey);
-		}
-		else {
-			sqlite_bind(*stmt_, *pkey, *pval);
-		}
+		sqlite_bind(*stmt_, *pkey, *pval);
 		
 		result = stmt;
 	}
@@ -365,13 +360,12 @@ AddIn xai_sqlite_query(
 	.Arguments({
 		Arg_db,
 		Arg_sql,
-		Arg_bind
 		})
 	.Category(CATEGORY)
 	.FunctionHelp("Return result of executing sql with optional binding.")
 	.HelpTopic("https://www.sqlite.org/c3ref/query.html")
 );
-LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, const LPOPER4 pval)
+LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql)
 {
 #pragma XLLEXPORT
 	static mem::XOPER<XLOPER12> result;
@@ -384,7 +378,6 @@ LPXLOPER12 WINAPI xll_sqlite_query(HANDLEX db, const LPOPER12 psql, const LPOPER
 		sqlite::stmt stmt(*db_);
 		std::string sql = to_string(*psql, " ", " ");
 		stmt.prepare(sql);
-		sqlite_bind(stmt, *pval);
 		
 		result.reset();
 		xll::headers(stmt, result);
