@@ -147,12 +147,14 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 		unsigned row = 0; // first row of data
 
 		if (pcolumns->is_missing()) {
+			ensure(rows(*pdata) > 1 || !"table must have at least two rows");
 			row = 1; // first row has column names
 			column.resize(1, pdata->columns());
 			for (unsigned j = 0; j < pdata->columns(); ++j) {
 				column[j] = data(0, j);
 			}
 		}
+		// quote column names
 		for (unsigned j = 0; j < column.size(); ++j) {
 			if (column[j].val.str[0] != 0 && column[j].val.str[1] != '[') {
 				column[j] = OPER("[") & column[j] & OPER("]");
