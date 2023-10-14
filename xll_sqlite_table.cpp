@@ -212,6 +212,11 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 
 		db = INVALID_HANDLEX;
 	}
+	catch (...) {
+		XLL_ERROR(__FUNCTION__ ": unknown exception");
+
+		db = INVALID_HANDLEX;
+	}
 
 	return db;
 }
