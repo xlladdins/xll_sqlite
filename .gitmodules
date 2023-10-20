@@ -2,3 +2,6 @@
 	path = fms_sqlite
 	url = https://github.com/keithalewis/fms_sqlite
 	branch = master
+[submodule "xll"]
+	path = xll
+	url = https://github.com/xlladdins/xll.git
