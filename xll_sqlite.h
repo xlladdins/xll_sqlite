@@ -110,8 +110,9 @@ namespace xll {
 	{
 		static const double _1970 = 25569;
 		static const double _3000 = 401769;
+		static const double _2038 = 50424; // 2038/1/19
 
-		return (x.type() == xltypeNum) and _1970 <= x.val.num and x.val.num <= _3000;
+		return (x.type() == xltypeNum) and _1970 <= x.val.num and x.val.num <= _2038;
 	}
 
 	template<class X>
@@ -165,7 +166,7 @@ namespace xll {
 			if (possibly_num_date(x)) {
 				return SQLITE_DATETIME;
 			}
-			else if (x.as_num() == (int)x.as_num()) {
+			else if (x.as_num() == (int64_t)x.as_num()) {
 				return SQLITE_INTEGER;
 			}
 			else {
@@ -178,6 +179,9 @@ namespace xll {
 		if (x.type() == xltypeStr) {
 			if (x.val.str[0] == 0) {
 				return SQLITE_NULL;
+			}
+			if (x.val.str[0] == 1 && strchr("YyNnTtFf", x.val.str[1])) {
+				return SQLITE_BOOLEAN;
 			}
 			struct tm tm;
 			if (is_str_date(x, &tm)) {
@@ -293,9 +297,19 @@ namespace xll {
 		case SQLITE_INTEGER:
 			stmt.bind(j, x.as_int());
 			break;
-		case SQLITE_BOOLEAN:
-			stmt.bind(j, x.as_int() != 0);
+		case SQLITE_BOOLEAN: {
+			bool b;
+			if (x.is_str()) {
+				ensure(x.val.str[0] == 1);
+				ensure(strchr("YyTtNnFf", x.val.str[1]));
+				b = (0 != strchr("YyTt", x.val.str[1]));
+			}
+			else {
+				b = x.as_int() != 0;
+			}
+			stmt.bind(j, b);
 			break;
+		}
 		case SQLITE_TEXT:
 			if (x.is_str()) {
 				stmt.bind(j, string_view(x));
