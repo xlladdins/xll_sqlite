@@ -12,7 +12,7 @@ AddIn xai_sqlite_types(
 		Arg(XLL_LONG, "column", "is the range column to check."),
 		})
 	.Category(CATEGORY)
-	.FunctionHelp("Guess sqlite types of columns.")
+	.FunctionHelp("Guess sqlite type of columns.")
 );
 LPOPER WINAPI xll_sqlite_types(const LPOPER po, long column)
 {
@@ -24,6 +24,15 @@ LPOPER WINAPI xll_sqlite_types(const LPOPER po, long column)
 
 	return &o;
 }
+
+// insert rows
+// insert into table values(?,...)
+// prepare
+// for rows
+//   for columns
+//     bind(..., sqltype)
+//   stmt.step
+//   stmt.reset
 
 AddIn xai_sqlite_insert_table(
 	Function(XLL_HANDLEX, "xll_sqlite_insert_table", CATEGORY ".INSERT_TABLE")
