@@ -109,7 +109,7 @@ namespace xll {
 	inline bool possibly_num_date(const XOPER<X>& x)
 	{
 		static const double _1970 = 25569;
-		static const double _3000 = 401769;
+		//static const double _3000 = 401769;
 		static const double _2038 = 50424; // 2038/1/19
 
 		return (x.type() == xltypeNum) and _1970 <= x.val.num and x.val.num <= _2038;
@@ -123,7 +123,7 @@ namespace xll {
 		}
 
 		auto vdt = view(x);
-		if (vdt.len == 0) {
+		if (vdt.len < 8) {
 			return false;
 		}
 
