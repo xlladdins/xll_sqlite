@@ -26,15 +26,16 @@ LPOPER WINAPI xll_sqlite_types(const LPOPER po, long column)
 }
 
 // types of table columns
-inline std::vector<int> sqlite_types(sqlite3* db, const char* table)
+inline std::map<std::string,std::pair<int,int>> sqlite_types(sqlite3* db, const char* table)
 {
-	std::vector<int> ts;
+	std::map<std::string, std::pair<int,int>> ts;
 
 	sqlite::stmt stmt(db);
 	const auto q = std::string("select * from ") + sqlite::table_name(table);
 	stmt.prepare(q.c_str());
 	for (int i = 0; i < stmt.column_count(); ++i) {
-		ts.push_back(stmt.sqltype(i));
+		const auto ni = stmt.column_name(i);
+		ts[stmt.column_name(i)] = std::make_pair(stmt.column_index(ni), stmt.sqltype(i));
 	}
 
 	return ts;
@@ -52,17 +53,22 @@ inline void sqlite_insert(sqlite::stmt& stmt, const OPER& data, int i, const std
 
 inline void sqlite_insert_into(sqlite3* db, const char* table, const OPER& data, unsigned off = 0)
 {
-	std::vector<int> ts = sqlite_types(db, table);
+	const auto nt = sqlite_types(db, table);
 	
 	auto sql = std::string("INSERT INTO ")
 		+ sqlite::table_name(table)
 		+ " VALUES (?";
-	for (size_t i = 1; i < ts.size(); ++i) {
+	for (size_t i = 1; i < nt.size(); ++i) {
 		sql.append(", ?");
 	}
 	sql.append(")");
 	sqlite::stmt stmt(db);
 	stmt.prepare(sql);
+
+	std::vector<int> ts(nt.size());
+	for (const auto& [ni, ti] : nt) {
+		ts[ti.first] = ti.second;
+	}
 
 	sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
 	try {

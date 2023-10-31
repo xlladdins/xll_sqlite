@@ -110,9 +110,10 @@ namespace xll {
 	{
 		static const double _1970 = 25569;
 		//static const double _3000 = 401769;
-		static const double _2038 = 50424; // 2038/1/19
+		//static const double _2038 = 50424; // 2038/1/19
+		static const double _2123 = 81723; // 2123/9/30
 
-		return (x.type() == xltypeNum) and _1970 <= x.val.num and x.val.num <= _2038;
+		return (x.type() == xltypeNum) and _1970 <= x.val.num and x.val.num <= _2123;
 	}
 
 	template<class X>
