@@ -167,7 +167,7 @@ namespace xll {
 			if (possibly_num_date(x)) {
 				return SQLITE_DATETIME;
 			}
-			else if (x.as_num() == (int64_t)x.as_num()) {
+			else if (x.val.num == std::floor(x.val.num) && std::fabs(x.val.num) < std::pow(2.,31)) {
 				return SQLITE_INTEGER;
 			}
 			else {
@@ -202,7 +202,9 @@ namespace xll {
 	{
 		try {
 			ensure(SQLITE_FLOAT == guess_one_sqltype(OPER(1.23)));
+			ensure(SQLITE_FLOAT == guess_one_sqltype(OPER(std::pow(2,31))));
 			ensure(SQLITE_INTEGER == guess_one_sqltype(OPER(123)));
+			ensure(SQLITE_INTEGER == guess_one_sqltype(OPER(std::pow(2, 31)-1)));
 			ensure(SQLITE_BOOLEAN == guess_one_sqltype(OPER(true)));
 			ensure(SQLITE_NULL == guess_one_sqltype(OPER()));
 			ensure(SQLITE_NULL == guess_one_sqltype(OPER("")));

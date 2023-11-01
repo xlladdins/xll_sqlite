@@ -173,10 +173,18 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 			}
 		}
 
-		if (ptypes->is_missing()) {
+		if (type.is_missing()) {
 			type.resize(1, data.columns());
 			for (unsigned j = 0; j < type.columns(); ++j) {
 				type[j] = guess_sqltype(data, j, data.rows() - row, row);
+			}
+		}
+		else {
+			ensure(type.size() == data.columns());
+			for (unsigned j = 0; j < type.columns(); ++j) {
+				if (!type[j].is_str()) {
+					type[j] = guess_sqltype(data, j, data.rows() - row, row);
+				}
 			}
 		}
 
