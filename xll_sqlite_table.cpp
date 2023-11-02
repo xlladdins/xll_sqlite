@@ -182,8 +182,11 @@ HANDLEX WINAPI xll_sqlite_create_table(HANDLEX db, const char* table, LPOPER pda
 		else {
 			ensure(type.size() == data.columns());
 			for (unsigned j = 0; j < type.columns(); ++j) {
-				if (!type[j].is_str()) {
-					type[j] = guess_sqltype(data, j, data.rows() - row, row);
+				if (type[j].is_str()) {
+					type[j] = sqlite::sqltype(type[j].to_string());
+				}
+				else {
+					type[j] = guess_sqltype(data, j, data.rows(), row);
 				}
 			}
 		}

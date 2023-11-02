@@ -230,7 +230,7 @@ namespace xll {
 		if (rows == -1) {
 			rows = x.rows();
 		}
-		for (unsigned i = off; i + off < rows; ++i) {
+		for (unsigned i = off; i < rows; ++i) {
 			auto ti = guess_one_sqltype(x(i, col));
 			ensure(ti != SQLITE_UNKNOWN);
 			if (ti != SQLITE_NULL) {
