@@ -278,11 +278,17 @@ namespace xll {
 		return i;
 	}
 
+	// Convert Excel type to SQLite type.
+	template<class X>
+	inline double to_float(const X& x)
+	{
+		return x.is_num() ? x.as_num() : Excel(xlfValue, x).as_num();	
+	}
+		
 	// Bind OPER to 1-based SQLite statement column j base on sqlite extended type tj.
 	template<class X>
-	inline void bind(sqlite::stmt& stmt, int j, const X& _x, int tj = 0)
+	inline void bind(sqlite::stmt& stmt, int j, const X& x, int tj = 0)
 	{
-		const OPER& x(_x);
 		if (!x) {
 			stmt.bind(j); // NULL
 		
@@ -295,7 +301,7 @@ namespace xll {
 
 		switch (tj) {
 		case SQLITE_FLOAT:
-			stmt.bind(j, x.as_num());
+			stmt.bind(j, to_float(x));
 			break;
 		case SQLITE_INTEGER:
 			stmt.bind(j, x.as_int());
