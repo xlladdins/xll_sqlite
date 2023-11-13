@@ -278,18 +278,25 @@ namespace xll {
 		return i;
 	}
 
-	// Convert Excel type to SQLite type.
+	// Convert Excel type to double.
 	template<class X>
-	inline double to_float(const X& x)
+	inline double to_float(const XOPER<X>& x)
 	{
 		return x.is_num() ? x.as_num() : Excel(xlfValue, x).as_num();	
 	}
-		
-	// Bind OPER to 1-based SQLite statement column j base on sqlite extended type tj.
+
+	// Convert Excel type to SQLite type.
 	template<class X>
-	inline void bind(sqlite::stmt& stmt, int j, const X& x, int tj = 0)
+	inline long to_int(const XOPER<X>& x)
 	{
-		if (!x) {
+		return x.is_int() ? x.as_num() : Excel(xlfValue, x).as_num();
+	}
+
+	// Bind OPER to 1-based SQLite statement column j based on sqlite extended type tj.
+	template<class X>
+	inline void bind(sqlite::stmt& stmt, int j, const XOPER<X>& x, int tj = 0)
+	{
+		if (x.is_missing() || x.is_nil()) {
 			stmt.bind(j); // NULL
 		
 			return;
@@ -299,46 +306,15 @@ namespace xll {
 			tj = stmt.sqltype(j); /// extended SQLite type
 		}
 
-		switch (tj) {
-		case SQLITE_FLOAT:
-			stmt.bind(j, to_float(x));
-			break;
-		case SQLITE_INTEGER:
-			stmt.bind(j, x.as_int());
-			break;
-		case SQLITE_BOOLEAN: {
-			bool b;
-			if (x.is_str()) {
-				ensure(x.val.str[0] == 1);
-				ensure(strchr("YyTtNnFf", x.val.str[1]));
-				b = (0 != strchr("YyTt", x.val.str[1]));
-			}
-			else {
-				b = x.as_int() != 0;
-			}
-			stmt.bind(j, b);
-			break;
-		}
-		case SQLITE_TEXT:
-			if (x.is_str()) {
-				stmt.bind(j, string_view(x));
-			}
-			else {
-				stmt.bind(j, to_string(x));
-			}
-			break;
-		case SQLITE_DATETIME:
-		{
+		// Special cases.
+		if (tj == SQLITE_DATETIME) {
 			if (x.is_num()) {
 				if (possibly_num_date(x)) {
 					stmt.bind(j, to_time_t(x.val.num));
-					break;
 				}
 				else {
-					stmt.bind(j, x.as_num()); // SQLITE_FLOAT
-					break;
+					stmt.bind(j, x.as_num()); // SQLITE_FLOAT Gregorian?
 				}
-				break;
 			}
 			else if (x.is_str()) {
 				auto sv = xll::view(x);
@@ -359,14 +335,44 @@ namespace xll {
 				ensure(!__FUNCTION__ ": date must be number or string");
 			}
 		}
-		break;
-		default:
-			stmt.bind(j); // NULL
+		else if (tj == SQLITE_BOOLEAN) {
+			bool b;
+			if (x.is_str()) {
+				ensure(x.val.str[0] == 1);
+				ensure(strchr("YyTtNnFf", x.val.str[1]));
+				b = (0 != strchr("YyTt", x.val.str[1]));
+			}
+			else {
+				b = x.as_int() != 0;
+			}
+			stmt.bind(j, b);
+		}
+		else { // flexible SQLite type
+			switch (x.type()) {
+			case xltypeNum:
+				stmt.bind(j, x.as_num());
+				break;
+			case xltypeInt:
+			case xltypeBool:
+				stmt.bind(j, x.as_int());
+				break;
+			case xltypeStr:
+				if (x.is_str()) {
+					stmt.bind(j, string_view(x));
+				}
+				else {
+					stmt.bind(j, to_string(x));
+				}
+				break;
+			default:
+				ensure(!__FUNCTION__ ": invalid type");
+			}
 		}
 	}
 
 	// Bind keys to values. 
-	inline void sqlite_bind(sqlite::stmt& stmt, const OPER4& key, const OPER4& val)
+	template<class X>
+	inline void sqlite_bind(sqlite::stmt& stmt, const X& key, const X& val)
 	{
 		size_t n = key.size();
 		ensure(val.size() == n);

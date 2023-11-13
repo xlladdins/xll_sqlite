@@ -294,15 +294,15 @@ AddIn xai_sqlite_stmt_bind(
 	Function(XLL_HANDLEX, "xll_sqlite_stmt_bind", CATEGORY ".BIND")
 	.Arguments({
 		Arg_stmt,
-		Arg_bind,
-		Arg(XLL_LPOPER4, "values", "is an optional array of values corresponding to keys."),
+		Arg(XLL_LPOPER, "keys", "is an optional array of values to bind."),
+		Arg(XLL_LPOPER, "values", "is an optional array of values corresponding to keys."),
 		})
 	.Uncalced()
 	.Category(CATEGORY)
 	.FunctionHelp("bind a value to indices in a statement.")
 	.HelpTopic("https://www.sqlite.org/c3ref/bind_blob.html")
 );
-HANDLEX WINAPI xll_sqlite_stmt_bind(HANDLEX stmt, const LPOPER4 pkey, const LPOPER4 pval)
+HANDLEX WINAPI xll_sqlite_stmt_bind(HANDLEX stmt, const LPOPER pkey, const LPOPER pval)
 {
 #pragma XLLEXPORT
 	HANDLEX result = INVALID_HANDLEX;
