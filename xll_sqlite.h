@@ -292,11 +292,17 @@ namespace xll {
 		return x.is_int() ? x.as_num() : Excel(xlfValue, x).as_num();
 	}
 
+	template<class X>
+	inline bool is_null(const XOPER<X>& x)
+	{
+		return x.is_missing() || x.is_nil() || x.is_err() || x == 0 || x == "");
+	}
+
 	// Bind OPER to 1-based SQLite statement column j based on sqlite extended type tj.
 	template<class X>
 	inline void bind(sqlite::stmt& stmt, int j, const XOPER<X>& x, int tj = 0)
 	{
-		if (x.is_missing() || x.is_nil()) {
+		if (x.is_missing() || x.is_nil() || x.is_err()) {
 			stmt.bind(j); // NULL
 		
 			return;
@@ -309,7 +315,10 @@ namespace xll {
 		// Special cases.
 		if (tj == SQLITE_DATETIME) {
 			if (x.is_num()) {
-				if (possibly_num_date(x)) {
+				if (x == 0) {
+					stmt.bind(j);
+				}
+				else if (possibly_num_date(x)) {
 					stmt.bind(j, to_time_t(x.val.num));
 				}
 				else {
@@ -319,16 +328,14 @@ namespace xll {
 			else if (x.is_str()) {
 				auto sv = xll::view(x);
 				struct tm tm;
-				if (fms::parse_tm(sv, &tm)) {
+				if (x == "") {
+					stmt.bind(j);
+				}
+				else if (fms::parse_tm(sv, &tm)) {
 					stmt.bind(j, _mkgmtime(&tm));
 				}
 				else {
-					std::string err(__FUNCTION__ ": invalid date string: ");
-					const auto esv = sv.error_msg();
-					OPER e(esv.buf, esv.len > 10 ? 10 : esv.len);
-					err.append(e.to_string());
-
-					throw std::runtime_error(err.c_str());
+					ensure (!__FUNCTION__ ": invalid date string: ");
 				}
 			}
 			else {
@@ -357,12 +364,7 @@ namespace xll {
 				stmt.bind(j, x.as_int());
 				break;
 			case xltypeStr:
-				if (x.is_str()) {
-					stmt.bind(j, string_view(x));
-				}
-				else {
-					stmt.bind(j, to_string(x));
-				}
+				stmt.bind(j, to_string(x));
 				break;
 			default:
 				ensure(!__FUNCTION__ ": invalid type");
