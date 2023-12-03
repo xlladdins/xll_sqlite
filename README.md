@@ -20,7 +20,7 @@ are provided in addition to [`=SQL.PRAGMA(db, pragma)`](https://www.sqlite.org/p
 that calls `PRAGMA pragma`.
 
 Call [`=SQL.QUERY(db, sql)`](https://www.sqlite.org/c3ref/query.html) to return
-the result of executing `sql`. 
+the result of executing `sql` including headers. Use `DROP(query,1)` to remove the headers.
 
 You can create a sqlite statement with `=SQL.STMT(db)`
 and use the result as the first argument to 
