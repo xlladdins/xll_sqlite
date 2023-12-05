@@ -296,7 +296,7 @@ namespace xll {
 	template<class X>
 	inline void bind(sqlite::stmt& stmt, int j, const XOPER<X>& x, int tj = 0)
 	{
-		if (x.is_missing() || x.is_nil()) {
+		if (x.is_missing() || x.is_nil() || x == "") {
 			stmt.bind(j); // NULL
 		
 			return;
