@@ -295,7 +295,7 @@ namespace xll {
 	template<class X>
 	inline bool is_null(const XOPER<X>& x)
 	{
-		return x.is_missing() || x.is_nil() || x.is_err() || x == 0 || x == "";
+		return x.is_missing() || x.is_nil() || x.is_err() || x == "";
 	}
 
 	// Bind OPER to 1-based SQLite statement column j based on sqlite extended type tj.
