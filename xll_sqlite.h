@@ -295,14 +295,14 @@ namespace xll {
 	template<class X>
 	inline bool is_null(const XOPER<X>& x)
 	{
-		return x.is_missing() || x.is_nil() || x.is_err() || x == 0 || x == "");
+		return x.is_missing() || x.is_nil() || x.is_err() || x == 0 || x == "";
 	}
 
 	// Bind OPER to 1-based SQLite statement column j based on sqlite extended type tj.
 	template<class X>
 	inline void bind(sqlite::stmt& stmt, int j, const XOPER<X>& x, int tj = 0)
 	{
-		if (x.is_missing() || x.is_nil() || x.is_err()) {
+		if (is_null(x)) {
 			stmt.bind(j); // NULL
 		
 			return;
