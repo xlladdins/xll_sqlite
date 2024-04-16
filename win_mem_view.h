@@ -3,7 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <memoryapi.h>
-#include "xll/xll/ensure.h"
+#include "xll24/ensure.h"
 
 namespace Win {
 

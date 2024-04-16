@@ -1,22 +1,22 @@
 // xll_lambda.cpp - utility functions for lambda expressions
-#include "xll/xll/xll.h"
+#include "xll24/xll.h"
 
 using namespace xll;
 
 AddIn xai_define_lambda(
 	Macro("xll_define_lambda", "XLL.DEFINE.LAMBDA")
-	.FunctionHelp("Define lambda from selection. Delete if single cell.")
+	//.FunctionHelp("Define lambda from selection. Delete if single cell.")
 );
 int WINAPI xll_define_lambda()
 {
 #pragma XLLEXPORT
 	try {
 		OPER s = Excel(xlfSelection);
-		ensure(s.type() == xltypeSRef);
+		ensure(type(s) == xltypeSRef);
 
-		REF r = reshape(s.as_sref(), 1, 1);
+		REF r = reshape(SRef(s), 1, 1);
 
-		if (s.columns() == 1) {
+		if (columns(s) == 1) {
 			for (unsigned i = 0; i < s.rows(); ++i) {
 				OPER name = Excel(xlCoerce, OPER(r));
 				if (name) {
@@ -26,7 +26,7 @@ int WINAPI xll_define_lambda()
 			}
 		}
 		else {
-			for (unsigned i = 0; i < s.rows(); ++i) {
+			for (unsigned i = 0; i < rows(s); ++i) {
 				OPER name = Excel(xlCoerce, OPER(r));
 
 				if (name) {
@@ -79,7 +79,7 @@ LPOPER WINAPI xll_get_name(LPOPER px, LPOPER pi)
 
 	try {
 		OPER name = *px;
-		ensure(name.is_str());
+		ensure(type(name) == xltypeStr);
 		ensure(name.val.str[0] > 0);
 		if (name.val.str[1] != '!') {
 			name = OPER("!") & name;

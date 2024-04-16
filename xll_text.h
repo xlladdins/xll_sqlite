@@ -1,6 +1,6 @@
 // xll_text.h - text functions
 #pragma once
-#include "xll/xll/xll.h"
+#include "xll24/xll.h"
 
 namespace xll {
 

@@ -8,8 +8,8 @@
 #include <numeric>
 #include "fms_sqlite/fms_sqlite.h"
 #include "xll_mem_oper.h"
-#include "xll/xll/splitpath.h"
-#include "xll/xll/xll.h"
+#include "xll24/splitpath.h"
+#include "xll24/xll.h"
 #include "xll_text.h"
 
 #ifndef CATEGORY
