@@ -2,8 +2,8 @@
 #pragma once
 #include <span>
 #include "win_mem_view.h"
-#include "xll24/XLCALL.h"
-#include "xll24/ensure.h"
+#include "xll24/include/XLCALL.h"
+#include "xll24/include/ensure.h"
 
 namespace xll::mem {
 

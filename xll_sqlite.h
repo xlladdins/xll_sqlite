@@ -8,8 +8,8 @@
 #include <numeric>
 #include "fms_sqlite/fms_sqlite.h"
 #include "xll_mem_oper.h"
-#include "xll24/splitpath.h"
-#include "xll24/xll.h"
+//#include "xll24/splitpath.h"
+#include "xll24/include/xll.h"
 #include "xll_text.h"
 
 #ifndef CATEGORY
@@ -17,11 +17,11 @@
 #endif
 
 // common arguments
-inline const auto Arg_db = xll::Arg(XLL_HANDLEX, "db", "is a handle to a sqlite database.");
-inline const auto Arg_stmt = xll::Arg(XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
-inline const auto Arg_sql = xll::Arg(XLL_LPOPER, "sql", "is a SQL query to execute.");
-inline const auto Arg_bind = xll::Arg(XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
-inline const auto Arg_table = xll::Arg(XLL_LPOPER4, "name", "the name of a table.");
+inline const auto Arg_db = xll::Arg(xll::XLL_HANDLEX, "db", "is a handle to a sqlite database.");
+inline const auto Arg_stmt = xll::Arg(xll::XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
+inline const auto Arg_sql = xll::Arg(xll::XLL_LPOPER, "sql", "is a SQL query to execute.");
+inline const auto Arg_bind = xll::Arg(xll::XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
+inline const auto Arg_table = xll::Arg(xll::XLL_LPOPER4, "name", "the name of a table.");
 
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
@@ -71,24 +71,6 @@ namespace xll {
 	{
 		return (d - 2440587.5);
 	}
-	// Excel Julian date to time_t
-	inline time_t to_time_t(double d)
-	{
-		return static_cast<time_t>((d - 25569) * 86400);
-	}
-
-	inline auto view(const XLOPER& o)
-	{
-		ensure(xltypeStr == type(o));
-
-		return fms::view<char>(o.val.str + 1, o.val.str[0]);
-	}
-	inline auto view(const XLOPER12& o)
-	{
-		ensure(xltypeStr == type(o));
-
-		return fms::view<XCHAR>(o.val.str + 1, o.val.str[0]);
-	}
 
 	inline auto string_view(const XLOPER& o)
 	{
@@ -105,25 +87,23 @@ namespace xll {
 
 	// heuristic to detect Excel date type
 	// if number in [1970, 3000] then possible date
-	template<class X>
-	inline bool possibly_num_date(const XOPER<X>& x)
+	inline bool possibly_num_date(const OPER& x)
 	{
 		static const double _1970 = 25569;
 		//static const double _3000 = 401769;
 		//static const double _2038 = 50424; // 2038/1/19
 		static const double _2123 = 81723; // 2123/9/30
 
-		return (x.type() == xltypeNum) and _1970 <= x.val.num and x.val.num <= _2123;
+		return isNum(x) and _1970 <= x.val.num and x.val.num <= _2123;
 	}
 
-	template<class X>
-	inline bool is_str_date(const XOPER<X>& x, tm* ptm)
+	inline bool is_str_date(const OPER& x, tm* ptm)
 	{
-		if (x.type() != xltypeStr) {
+		if (!isStr(x)) {
 			return false;
 		}
 
-		auto vdt = view(x);
+		auto vdt = fms::view(x.val.str+1,x.val.str[0]);
 		if (vdt.len < 8) {
 			return false;
 		}
@@ -158,12 +138,11 @@ namespace xll {
 #endif // _DEBUG
 
 	// bool < int < float < text
-	template<class X>
-	inline int guess_one_sqltype(const XOPER<X>& x)
+	inline int guess_one_sqltype(const OPER& x)
 	{
-		ensure(x.size() <= 1);
+		ensure(size(x) <= 1);
 
-		if (x.is_num()) {
+		if (isNum(x)) {
 			if (possibly_num_date(x)) {
 				return SQLITE_DATETIME;
 			}
@@ -175,9 +154,9 @@ namespace xll {
 			}
 		}
 
-		if (x.is_bool()) return SQLITE_BOOLEAN;
+		if (isBool(x)) return SQLITE_BOOLEAN;
 
-		if (x.type() == xltypeStr) {
+		if (isStr(x)) {
 			if (x.val.str[0] == 0) {
 				return SQLITE_NULL;
 			}
@@ -195,7 +174,7 @@ namespace xll {
 
 		if (!x) return SQLITE_NULL;
 
-		return sqltype(x.type());
+		return sqltype(type(x));
 	}
 #ifdef _DEBUG
 	inline int test_guess_one_sqlite_type()
@@ -221,16 +200,15 @@ namespace xll {
 		return TRUE;
 	}
 #endif // _DEBUG
-	template<class X>
-	inline int guess_sqltype(const XOPER<X>& x, unsigned col, unsigned rows = -1, unsigned off = 0)
+	inline int guess_sqltype(const OPER& x, int col, int rows = -1, int off = 0)
 	{
-		ensure(col < x.columns());
+		ensure(col < columns(x));
 
 		std::set<int> types;
 		if (rows == -1) {
-			rows = x.rows();
+			rows = xll::rows(x);
 		}
-		for (unsigned i = off; i < rows; ++i) {
+		for (int i = off; i < rows; ++i) {
 			auto ti = guess_one_sqltype(x(i, col));
 			ensure(ti != SQLITE_UNKNOWN);
 			if (ti != SQLITE_NULL) {
@@ -260,15 +238,14 @@ namespace xll {
 	}
 
 	// 1-based
-	template<class X>
-	inline int bind_parameter_index(sqlite3_stmt* stmt, const XOPER<X>& o)
+	inline int bind_parameter_index(sqlite3_stmt* stmt, const OPER& o)
 	{
 		int i = 0; // not found
 
-		if (o.is_num()) {
-			i = o.as_int();
+		if (isNum(o)) {
+			i = (int)asNum(o);
 		}
-		else if (o.is_str()) {
+		else if (isStr(o)) {
 			i = sqlite3_bind_parameter_index(stmt, to_string(o).c_str());
 		}
 		else {
@@ -279,28 +256,24 @@ namespace xll {
 	}
 
 	// Convert Excel type to double.
-	template<class X>
-	inline double to_float(const XOPER<X>& x)
+	inline double to_float(const OPER& x)
 	{
-		return x.is_num() ? x.as_num() : Excel(xlfValue, x).as_num();	
+		return isNum(x) ? asNum(x) : asNum(Excel(xlfValue, x));	
 	}
 
 	// Convert Excel type to SQLite type.
-	template<class X>
-	inline long to_int(const XOPER<X>& x)
+	inline long to_int(const OPER& x)
 	{
-		return x.is_int() ? x.as_num() : Excel(xlfValue, x).as_num();
+		return static_cast<long>(isInt(x) ? asNum(x) : asNum(Excel(xlfValue, x)));
 	}
 
-	template<class X>
-	inline bool is_null(const XOPER<X>& x)
+	inline bool is_null(const OPER& x)
 	{
-		return x.is_missing() || x.is_nil() || x.is_err();
+		return isMissing(x) || isNil(x) || isErr(x);
 	}
 
 	// Bind OPER to 1-based SQLite statement column j based on sqlite extended type tj.
-	template<class X>
-	inline void bind(sqlite::stmt& stmt, int j, const XOPER<X>& x, int tj = 0)
+	inline void bind(sqlite::stmt& stmt, int j, const OPER& x, int tj = 0)
 	{
 		if (is_null(x)) {
 			stmt.bind(j); // NULL
@@ -314,7 +287,7 @@ namespace xll {
 
 		// Special cases.
 		if (tj == SQLITE_DATETIME) {
-			if (x.is_num()) {
+			if (isNum(x)) {
 				if (x == 0) {
 					stmt.bind(j);
 				}
@@ -322,11 +295,11 @@ namespace xll {
 					stmt.bind(j, to_time_t(x.val.num));
 				}
 				else {
-					stmt.bind(j, x.as_num()); // SQLITE_FLOAT Gregorian?
+					stmt.bind(j, asNum(x)); // SQLITE_FLOAT Gregorian?
 				}
 			}
-			else if (x.is_str()) {
-				auto sv = xll::view(x);
+			else if (isStr(x)) {
+				auto sv = fms::view(x.val.str + 1, x.val.str[0]);
 				struct tm tm;
 				if (x == "") {
 					stmt.bind(j);
@@ -344,24 +317,24 @@ namespace xll {
 		}
 		else if (tj == SQLITE_BOOLEAN) {
 			bool b;
-			if (x.is_str()) {
+			if (isStr(x)) {
 				ensure(x.val.str[0] == 1);
 				ensure(strchr("YyTtNnFf", x.val.str[1]));
 				b = (0 != strchr("YyTt", x.val.str[1]));
 			}
 			else {
-				b = x.as_int() != 0;
+				b = asNum(x) != 0;
 			}
 			stmt.bind(j, b);
 		}
 		else { // flexible SQLite type
-			switch (x.type()) {
+			switch (type(x)) {
 			case xltypeNum:
-				stmt.bind(j, x.as_num());
+				stmt.bind(j, asNum(x));
 				break;
 			case xltypeInt:
 			case xltypeBool:
-				stmt.bind(j, x.as_int());
+				stmt.bind(j, (int)asNum(x));
 				break;
 			case xltypeStr:
 				stmt.bind(j, to_string(x));
@@ -373,15 +346,14 @@ namespace xll {
 	}
 
 	// Bind keys to values. 
-	template<class X>
-	inline void sqlite_bind(sqlite::stmt& stmt, const X& key, const X& val)
+	inline void sqlite_bind(sqlite::stmt& stmt, const OPER& key, const OPER& val)
 	{
-		size_t n = key.size();
-		ensure(val.size() == n);
+		size_t n = size(key);
+		ensure(size(val) == n);
 
-		for (unsigned i = 0; i < n; ++i) {
+		for (int i = 0; i < n; ++i) {
 			int pi = 1 + i; // bind position
-			if (key[i].is_str()) {
+			if (isStr(key[i])) {
 				const auto ki = key[i].to_string();
 				pi = stmt.bind_parameter_index(ki.c_str());
 				if (!pi) {
@@ -394,51 +366,50 @@ namespace xll {
 	}
 
 	// Convert SQLite value to OPER.
-	template<class X>
 	inline auto as_oper(const sqlite::value& v)
 	{
 		switch (v.sqltype()) {
 		case SQLITE_INTEGER:
-			return XOPER<X>(v.as_int());
+			return OPER(v.as_int());
 		case SQLITE_FLOAT:
-			return XOPER<X>(v.as_float());
+			return OPER(v.as_float());
 		case SQLITE_TEXT: {
 			const auto str = v.as_text();
-			return XOPER<X>(str.data(), (int)str.size());
+			return OPER(str.data(), (int)str.size());
 		}
 		//case SQLITE_BLOB:
 		case SQLITE_BOOLEAN:
-			return XOPER<X>(v.as_boolean());
+			return OPER(v.as_boolean());
 		case SQLITE_DATETIME: {
 			auto dt = v.as_datetime();
 			if (SQLITE_TEXT == dt.type) {
 				fms::view vdt(dt.value.t);
 				if (vdt.len == 0) {
-					return XOPER<X>("");
+					return OPER("");
 				}
 				struct tm tm;
 				if (fms::parse_tm(vdt, &tm)) {
-					return XOPER<X>(to_excel(_mkgmtime(&tm)));
+					return OPER(to_excel(_mkgmtime(&tm)));
 				}
 				else {
-					return XOPER<X>(to_excel(dt.value.f));
+					return OPER(to_excel(dt.value.f));
 				}
 			}
 			else if (SQLITE_INTEGER == dt.type) {
-				return XOPER<X>(to_excel(dt.value.i));
+				return OPER(to_excel(dt.value.i));
 			}
 			else if (SQLITE_FLOAT == dt.type) {
-				return XOPER<X>(to_excel(dt.value.f));
+				return OPER(to_excel(dt.value.f));
 			}
 			else {
-				return XOPER<X>(XOPER<X>::Err::NA);
+				return OPER(OPER::Err::NA);
 			}
 			break;
 		}
 		case SQLITE_NULL:
-			return XOPER<X>("");
+			return OPER("");
 		default:
-			return XOPER<X>(XOPER<X>::Err::NA);
+			return OPER(OPER::Err::NA);
 		}
 	}
 
@@ -446,7 +417,7 @@ namespace xll {
 	inline auto headers(sqlite::stmt& stmt, O& o)
 	{
 		for (int i = 0; i < stmt.column_count(); ++i) {
-			o.push_back(XOPER<X>(stmt[i].name()));
+			o.push_back(OPER(stmt[i].name()));
 		}
 	}
 
@@ -472,13 +443,13 @@ namespace xll {
 	// iterate over rows and columns of XOPER
 	template<class X>
 	class iterable {
-		const XOPER<X>& o;
+		const OPER& o;
 		unsigned row;
 	public:
 		using iterator_category = std::forward_iterator_tag;
 		using value_type = X;
 
-		iterable(const XOPER<X>& o, unsigned row = 0)
+		iterable(const OPER& o, unsigned row = 0)
 			: o{ o }, row{ row }
 		{ }
 
@@ -566,7 +537,7 @@ namespace xll {
 	template<class X>
 	inline auto copy(typename iterable<X>::iterator& x, sqlite::stmt& o)
 	{
-		//const XOPER<X>& x{ _x };
+		//const OPER& x{ _x };
 		//ensure(x.size() == o.column_count());
 
 		for (int i = 0; i < x.size(); ++i) {
@@ -587,7 +558,7 @@ namespace xll {
 
 	/* !!!
 	template<class X>
-	inline void bind(sqlite3_stmt* stmt, int i, const XOPER<X>& o, int type = 0)
+	inline void bind(sqlite3_stmt* stmt, int i, const OPER& o, int type = 0)
 	{
 		if (o.is_nil()) {
 			sqlite3_bind_null(stmt, i);

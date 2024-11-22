@@ -1,5 +1,5 @@
 // xll_lambda.cpp - utility functions for lambda expressions
-#include "xll24/xll.h"
+#include "xll24/include/xll.h"
 
 using namespace xll;
 
@@ -14,10 +14,10 @@ int WINAPI xll_define_lambda()
 		OPER s = Excel(xlfSelection);
 		ensure(type(s) == xltypeSRef);
 
-		REF r = reshape(SRef(s), 1, 1);
+		REF r = reshape(SRef(s), 1, 1); // upper left corner of selection
 
 		if (columns(s) == 1) {
-			for (unsigned i = 0; i < s.rows(); ++i) {
+			for (int i = 0; i < rows(s); ++i) {
 				OPER name = Excel(xlCoerce, OPER(r));
 				if (name) {
 					Excel(xlcDeleteName, name);
@@ -26,7 +26,7 @@ int WINAPI xll_define_lambda()
 			}
 		}
 		else {
-			for (unsigned i = 0; i < rows(s); ++i) {
+			for (int i = 0; i < rows(s); ++i) {
 				OPER name = Excel(xlCoerce, OPER(r));
 
 				if (name) {
@@ -85,7 +85,7 @@ LPOPER WINAPI xll_get_name(LPOPER px, LPOPER pi)
 			name = OPER("!") & name;
 		}
 
-		if (pi->is_missing()) {
+		if (isMissing(*pi)) {
 			result = Excel(xlfGetName, name);
 		}
 		else {

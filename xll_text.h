@@ -1,6 +1,6 @@
 // xll_text.h - text functions
 #pragma once
-#include "xll24/xll.h"
+#include "xll24/include/xll.h"
 
 namespace xll {
 
@@ -46,13 +46,13 @@ namespace xll {
 		OPER FS(fs);
 		OPER RS(rs ? rs : fs);
 		OPER LQ(lq ? lq : "");
-		OPER RQ(rq ? rq : LQ);
+		OPER RQ(rq ? rq : (lq ? lq : ""));
 
-		for (unsigned i = 0; i < o.rows(); ++i) {
+		for (int i = 0; i < rows(o); ++i) {
 			if (rs && i > 0) {
 				O &= RS;
 			}
-			for (unsigned j = 0; j < o.columns(); ++j) {
+			for (int j = 0; j < columns(o); ++j) {
 				if (fs && j > 0) {
 					O &= FS;
 				}
@@ -69,12 +69,12 @@ namespace xll {
 	{
 		std::string s;
 
-		if (o.is_multi()) {
-			for (unsigned i = 0; i < o.rows(); ++i) {
+		if (isMulti(o)) {
+			for (int i = 0; i < rows(o); ++i) {
 				if (rs && i > 0) {
 					s.append(rs);
 				}
-				for (unsigned j = 0; j < o.columns(); ++j) {
+				for (int j = 0; j < columns(o); ++j) {
 					if (fs && j > 0) {
 						s.append(fs);
 					}
@@ -82,17 +82,17 @@ namespace xll {
 				}
 			}
 		}
-		else if (o.is_str()) {
+		else if (isStr(o)) {
 			s = wcstombs(o.val.str + 1, o.val.str[0]);
 		}
-		else if (o.is_bool()) {
+		else if (isBool(o)) {
 			s = o.val.xbool ? "TRUE" : "FALSE";
 		}
-		else if (o.is_nil()) {
+		else if (isNil(o)) {
 			s = "";
 		}
-		else if (o.is_err()) {
-			s = xll_err_str[o.val.err];
+		else if (isErr(o)) {
+			s = xlerr_string(static_cast<xll::xlerr>(o.val.err));
 		}
 		else {
 			const auto& v = Excel(xlfText, o, OPER("General"));
