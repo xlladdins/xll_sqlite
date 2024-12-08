@@ -16,13 +16,6 @@
 #define CATEGORY "SQL"
 #endif
 
-// common arguments
-inline const auto Arg_db = xll::Arg(xll::XLL_HANDLEX, "db", "is a handle to a sqlite database.");
-inline const auto Arg_stmt = xll::Arg(xll::XLL_HANDLEX, "stmt", "is a handle to a sqlite statement.");
-inline const auto Arg_sql = xll::Arg(xll::XLL_LPOPER, "sql", "is a SQL query to execute.");
-inline const auto Arg_bind = xll::Arg(xll::XLL_LPOPER4, "_bind", "is an optional array of values to bind.");
-inline const auto Arg_table = xll::Arg(xll::XLL_LPOPER4, "name", "the name of a table.");
-
 // xltype to sqlite type
 #define XLL_SQLITE_TYPE(X) \
 X(xltypeInt,     SQLITE_INTEGER, "INTEGER") \
